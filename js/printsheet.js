@@ -2,7 +2,7 @@
 // over flere sider. Brukes både til «Skriv ut» og til «Lagre som PDF» i
 // nettleserens utskriftsdialog.
 
-import { cellOriginX, cellIndex } from './pattern.js';
+import { cellIndex, rowShiftOf, gridSpanX } from './pattern.js';
 import { contrastTextColor } from './color.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -69,7 +69,7 @@ function svgPage() {
 function autoCellMm(pattern) {
   const availW = CONTENT_W - LABEL;
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
-  const spanX = pattern.grid === 'offset' ? pattern.gridW + 0.5 : pattern.gridW;
+  const spanX = gridSpanX(pattern);
   const aspect = pattern.cellAspect || 1;
   for (const mm of [12, 10, 9, 8, 7, 6, 5]) {
     if (spanX * mm <= availW && pattern.gridH * (mm / aspect) <= availH) return mm;
@@ -92,7 +92,7 @@ export function buildPrintSheets(pattern, opts) {
 
   const availW = CONTENT_W - LABEL;
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
-  const extra = pattern.grid === 'offset' ? 0.5 : 0;
+  const extra = gridSpanX(pattern) - pattern.gridW;
   const colsPerPage = Math.max(1, Math.floor(availW / cellMm - extra));
   const rowsPerPage = Math.max(1, Math.floor(availH / cellHMm));
 
@@ -153,7 +153,7 @@ function buildOverviewPage(pattern, opts, info) {
 
     const facts = [];
     if (opts.pitch) {
-      const cmW = (pattern.gridW * opts.pitch.w) / 10;
+      const cmW = ((pattern.spanX || pattern.gridW) * opts.pitch.w) / 10;
       const cmH = (pattern.gridH * opts.pitch.h) / 10;
       facts.push(`Ferdig størrelse: ca. ${fmt(cmW)} × ${fmt(cmH)} cm`);
     }
@@ -164,7 +164,9 @@ function buildOverviewPage(pattern, opts, info) {
       facts.push('Malen er i naturlig størrelse: legg brettet rett oppå arket.');
       facts.push('Skriv ut uten skalering, og mål kontrollinjalen nederst.');
     }
-    if (pattern.grid === 'offset') facts.push('Annenhver rad er forskjøvet en halv brikke.');
+    if (pattern.rowShift) {
+      facts.push(`Hver rad er forskjøvet ${fmt(pattern.rowShift * 100)} % av en brikkebredde mot høyre.`);
+    }
 
     facts.forEach((t, i) => {
       svg.appendChild(el('text', { x: M + w + 6, y: y + 5 + i * 5.2, class: 'p-fact' }, t));
@@ -213,7 +215,7 @@ function buildGridPage(pattern, opts, t) {
 
   const cols = x1 - x0;
   const rows = y1 - y0;
-  const extra = pattern.grid === 'offset' ? 0.5 : 0;
+  const extra = gridSpanX(pattern) - pattern.gridW;
   const gridW = (cols + extra) * cellMm;
   const gridH = rows * cellHMm;
   const ox = M + LABEL;
@@ -248,7 +250,7 @@ function buildGridPage(pattern, opts, t) {
 
   const cellsGroup = el('g', {});
   for (let y = y0; y < y1; y++) {
-    const shift = pattern.grid === 'offset' && y % 2 === 1 ? cellMm * 0.5 : 0;
+    const shift = rowShiftOf(pattern, y) * cellMm;
     for (let x = x0; x < x1; x++) {
       const pi = pattern.indices[cellIndex(pattern, x, y)];
       const px = ox + (x - x0) * cellMm + shift;
@@ -294,7 +296,7 @@ function buildGridPage(pattern, opts, t) {
     const seg = `M${ox} ${py}H${ox + gridW}`;
     (y % 5 === 0 || y === y0 || y === y1 ? (dThick += seg) : (dThin += seg));
   }
-  if (pattern.grid === 'square') {
+  if (!pattern.rowShift) {
     for (let x = x0; x <= x1; x++) {
       const px = ox + (x - x0) * cellMm;
       const seg = `M${px} ${oy}V${oy + gridH}`;
@@ -303,7 +305,7 @@ function buildGridPage(pattern, opts, t) {
   } else {
     // Forskjøvet rutenett: marker brikkeskiller per rad.
     for (let y = y0; y < y1; y++) {
-      const shift = y % 2 === 1 ? cellMm * 0.5 : 0;
+      const shift = rowShiftOf(pattern, y) * cellMm;
       const py = oy + (y - y0) * cellHMm;
       for (let x = x0; x <= x1; x++) {
         const px = ox + (x - x0) * cellMm + shift;
@@ -370,7 +372,7 @@ export function estimateSheets(pattern, opts = {}) {
   const cellHMm = cellMm / (pattern.cellAspect || 1);
   const availW = CONTENT_W - LABEL;
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
-  const extra = pattern.grid === 'offset' ? 0.5 : 0;
+  const extra = gridSpanX(pattern) - pattern.gridW;
   const colsPerPage = Math.max(1, Math.floor(availW / cellMm - extra));
   const rowsPerPage = Math.max(1, Math.floor(availH / cellHMm));
   const overlap = opts.overlap ? 1 : 0;

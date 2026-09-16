@@ -86,18 +86,19 @@ export function computeSourceRect(srcW, srcH, targetAspect, fit, posX = 0.5, pos
  * Bokfilter-nedskalering fra kildebildet til rutenettet.
  *
  * Hver rute dekker et rektangel i kildebildet og får gjennomsnittet av det.
- * For forskjøvede rutenett (Plus-Plus) flyttes annenhver rad en halv rute.
+ * `rowShift` forskyver hver rad sidelengs, som andel av rutebredden, slik at
+ * prøvepunktene treffer der brikkene faktisk havner.
  *
  * Returnerer sRGB-float i [0,1] pluss alfa per rute.
  */
-export function sampleToGrid(raster, rect, gridW, gridH, offsetRows = false) {
+export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW) {
   const { width: sw, height: sh, linear } = raster;
   const out = new Float32Array(gridW * gridH * 4);
-  const cellW = rect.w / gridW;
+  const cellW = rect.w / spanX;
   const cellH = rect.h / gridH;
 
   for (let gy = 0; gy < gridH; gy++) {
-    const shift = offsetRows && gy % 2 === 1 ? cellW * 0.5 : 0;
+    const shift = rowShift ? ((gy * rowShift) % 1) * cellW : 0;
     const fy0 = rect.y + gy * cellH;
     const fy1 = fy0 + cellH;
     const y0 = Math.max(0, Math.floor(fy0));

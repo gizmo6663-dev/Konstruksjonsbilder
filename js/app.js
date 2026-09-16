@@ -109,6 +109,7 @@ function recompute() {
     gridW: state.gridW,
     gridH: state.gridH,
     grid: mat.grid,
+    rowShift: mat.rowShift || 0,
     cellAspect: cellAspect(),
     fit: state.fit,
     posX: state.posX,
@@ -210,7 +211,7 @@ function drawOriginal(budget) {
 
 function renderStats() {
   const mat = currentMaterial();
-  const cmW = (pattern.gridW * state.pitch.w) / 10;
+  const cmW = ((pattern.spanX || pattern.gridW) * state.pitch.w) / 10;
   const cmH = (pattern.gridH * state.pitch.h) / 10;
   const parts = [
     `<span>Rutenett: <b>${pattern.gridW} × ${pattern.gridH}</b></span>`,

@@ -1,7 +1,16 @@
 // Tegning av mønsteret på lerret.
 
-import { gridSpanX, cellOriginX, cellIndex } from './pattern.js';
+import { gridSpanX, cellOriginX, cellIndex, rowShiftOf } from './pattern.js';
 import { contrastTextColor } from './color.js';
+
+// Omrisset av en Plus-Plus-brikke i enhetsruter:
+//   . # . # .
+//   # # # # #
+//   . # . # .
+const PLUSPLUS_OUTLINE = [
+  [1, 0], [2, 0], [2, 1], [3, 1], [3, 0], [4, 0], [4, 1], [5, 1], [5, 2], [4, 2],
+  [4, 3], [3, 3], [3, 2], [2, 2], [2, 3], [1, 3], [1, 2], [0, 2], [0, 1], [1, 1],
+];
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -66,7 +75,7 @@ export function drawPattern(ctx, pattern, opts = {}) {
 
   if (opts.highlightRow != null && opts.highlightRow >= 0) {
     const y = opts.highlightRow;
-    const shift = pattern.grid === 'offset' && y % 2 === 1 ? cell * 0.5 : 0;
+    const shift = rowShiftOf(pattern, y) * cell;
     ctx.strokeStyle = '#ff3d71';
     ctx.lineWidth = Math.max(2, cell * 0.12);
     ctx.strokeRect(shift + ctx.lineWidth / 2, y * cellH + ctx.lineWidth / 2,
@@ -110,32 +119,22 @@ function drawCell(ctx, style, x, y, w, h, hex) {
       break;
     }
     case 'plus': {
-      // Brikkene griper inn i radene over og under. Vi tegner derfor plusset
-      // høyere enn selve ruta, men aldri høyere enn det er bredt.
-      const ph = Math.min(h * 2, w);
+      // Plus-Plus-brikka: en bred H der tverrstreken stikker ut på hver side –
+      // to plusstegn smeltet sammen. Formen er 5 × 3 enheter, mens ruta bare
+      // er radavstanden bred, så brikka griper inn i radene over og under.
+      const u = w / 5;
+      const ph = u * 3;
       const y0 = y + (h - ph) / 2;
-      const t = 0.3; // halv armbredde som andel av brikka
-      const x0 = x;
-      const a = w * (0.5 - t), b = w * (0.5 + t);
-      const c = ph * (0.5 - t), d = ph * (0.5 + t);
       ctx.beginPath();
-      ctx.moveTo(x0 + a, y0);
-      ctx.lineTo(x0 + b, y0);
-      ctx.lineTo(x0 + b, y0 + c);
-      ctx.lineTo(x0 + w, y0 + c);
-      ctx.lineTo(x0 + w, y0 + d);
-      ctx.lineTo(x0 + b, y0 + d);
-      ctx.lineTo(x0 + b, y0 + ph);
-      ctx.lineTo(x0 + a, y0 + ph);
-      ctx.lineTo(x0 + a, y0 + d);
-      ctx.lineTo(x0, y0 + d);
-      ctx.lineTo(x0, y0 + c);
-      ctx.lineTo(x0 + a, y0 + c);
+      for (let i = 0; i < PLUSPLUS_OUTLINE.length; i++) {
+        const [ox, oy] = PLUSPLUS_OUTLINE[i];
+        const px = x + ox * u;
+        const py = y0 + oy * u;
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
       ctx.closePath();
       ctx.fill();
-      // Tynt omriss gjør at hver enkelt brikke skiller seg fra naboene,
-      // også der to like farger ligger inntil hverandre.
-      const stroke = Math.min(w, ph) * 0.06;
+      const stroke = u * 0.16;
       if (stroke > 0.35) {
         ctx.save();
         ctx.strokeStyle = 'rgba(0,0,0,.72)';
@@ -180,7 +179,7 @@ function drawGrid(ctx, pattern, cell, cellH, opts) {
   const height = pattern.gridH * cellH;
   ctx.lineWidth = 1;
 
-  if (pattern.grid === 'offset') {
+  if (pattern.rowShift) {
     // Forskjøvet rutenett: bare radlinjer gir mening på tvers.
     ctx.strokeStyle = 'rgba(0,0,0,.18)';
     ctx.beginPath();

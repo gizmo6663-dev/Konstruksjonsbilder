@@ -128,27 +128,30 @@ export const MATERIALS = [
     name: 'Plus-Plus',
     short: 'Plus-Plus',
     icon: 'plus',
-    description: 'Plus-Plus-brikker lagt flatt i forskjøvede rader.',
+    description: 'Plus-Plus-brikker lagt flatt, nestet i hverandre.',
     palette: 'plusplus',
-    grid: 'offset',
-    // Radene ligger en halv brikkehøyde fra hverandre og forskyves annenhver
-    // gang en halv brikke sidelengs – det er slik brikkene låser i hverandre.
-    // Derfor er høyden per rad halvparten av bredden per brikke.
-    fixedShape: false,
+    grid: 'lattice',
+    // Brikka er en bred H – to plusstegn smeltet sammen – 5 enheter bred og
+    // 3 høy. Lagt ende mot ende i en rad er det 5 enheter mellom brikkene.
+    // Neste rad ligger 2 enheter ned og 1 enhet sidelengs, så bumpene griper
+    // inn i raden over. Derfor: rutebredde 5 enheter, radhøyde 2, og hver rad
+    // forskjøvet 1/5 brikkebredde.
+    rowShift: 0.2,
+    fixedShape: true,
     style: 'plus',
     unit: 'brikke',
     unitPlural: 'brikker',
-    pitch: { w: 20, h: 10 },
+    // Én enhet er ca. 4 mm, så brikka blir ca. 20 mm bred og radene 8 mm.
+    pitch: { w: 20, h: 8 },
     presets: [
-      { name: 'Lite – 16 brikker bredt', w: 16, h: 32 },
-      { name: 'Mellom – 24 brikker bredt', w: 24, h: 48 },
-      { name: 'Stort – 32 brikker bredt', w: 32, h: 64 },
-      { name: 'Ekstra stort – 48 brikker bredt', w: 48, h: 96 },
+      { name: 'Lite – 16 brikker bredt', w: 16, h: 40 },
+      { name: 'Mellom – 24 brikker bredt', w: 24, h: 60 },
+      { name: 'Stort – 32 brikker bredt', w: 32, h: 80 },
     ],
     tips: [
-      'Brikkene låser i hverandre: annenhver rad er forskjøvet en halv brikke, og radene ligger en halv brikkehøyde fra hverandre. Derfor er radtallet omtrent dobbelt så høyt som kolonnetallet for et kvadratisk motiv.',
-      'Legger du brikkene annerledes, endres forholdet mellom bredde og høyde. Bygg en testflate på 4 × 4 brikker, mål den, og juster «brikkeform» under Størrelse til bildet ikke blir strukket.',
-      'Bygg nedenfra og opp, rad for rad – da ser du fort om en rad har kommet ut av takt.',
+      'Brikkene kobles ende mot ende i rette rader. Neste rad legges en femtedels brikke inn mot høyre, slik at bumpene griper ned i raden over – det er den forskyvningen malen er tegnet med.',
+      'Hver femte rad står rett under den første igjen. Mister du takten, tell deg tilbake dit.',
+      'Måler brikkene dine noe annet enn 20 mm brede, endre tallet under Brikkemål – da blir ferdigmålet og 1:1-utskriften riktig.',
     ],
   },
   {

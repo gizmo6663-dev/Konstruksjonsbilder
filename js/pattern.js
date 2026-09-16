@@ -4,14 +4,30 @@ import { buildMatcher } from './color.js';
 import { computeSourceRect, sampleToGrid, applyAdjustments, removeBackground } from './imageops.js';
 import { quantize, countColors, assignSymbols } from './quantize.js';
 
-/** Full bredde på rutenettet i ruteenheter – forskjøvede rader stikker en halv rute ut. */
+// Rutenettet er et gitter: hver rad kan være forskjøvet sidelengs i forhold til
+// raden over. `rowShift` er forskyvningen per rad, som andel av rutebredden.
+// 0 gir rette kolonner; 0,5 gir murforband; 0,2 gir Plus-Plus sin fletting.
+// Forskyvningen er kumulativ, slik at rad r står `r * rowShift` inn.
+
+/** Hvor mye rad y er forskjøvet, i ruteenheter, alltid i [0, 1). */
+export function rowShiftOf(pattern, y) {
+  const s = pattern.rowShift || 0;
+  if (!s) return 0;
+  const v = (y * s) % 1;
+  return v < 0 ? v + 1 : v;
+}
+
+/** Full bredde på rutenettet i ruteenheter – forskjøvede rader stikker utenfor. */
 export function gridSpanX(pattern) {
-  return pattern.grid === 'offset' && pattern.gridH > 1 ? pattern.gridW + 0.5 : pattern.gridW;
+  if (!pattern.rowShift || pattern.gridH < 2) return pattern.gridW;
+  let max = 0;
+  for (let y = 0; y < pattern.gridH; y++) max = Math.max(max, rowShiftOf(pattern, y));
+  return pattern.gridW + max;
 }
 
 /** Venstre kant for en rute, i ruteenheter. */
 export function cellOriginX(pattern, x, y) {
-  return pattern.grid === 'offset' && y % 2 === 1 ? x + 0.5 : x;
+  return x + rowShiftOf(pattern, y);
 }
 
 export function cellIndex(pattern, x, y) {
@@ -32,15 +48,19 @@ export function colorAt(pattern, x, y) {
  */
 export function buildPattern(raster, settings) {
   const {
-    gridW, gridH, grid, cellAspect, colors,
+    gridW, gridH, grid, rowShift, cellAspect, colors,
     fit, posX, posY,
     brightness, contrast, saturation,
     dither, ditherAmount, backgroundTolerance,
   } = settings;
 
-  const targetAspect = (gridW * cellAspect) / gridH;
+  // Forskjøvede rader stikker utenfor gridW, så utsnittet må dekke hele
+  // spennet – ellers faller siste kolonne i de forskjøvede radene utenfor
+  // bildet og blir tom.
+  const spanX = gridSpanX({ gridW, gridH, rowShift });
+  const targetAspect = (spanX * cellAspect) / gridH;
   const rect = computeSourceRect(raster.width, raster.height, targetAspect, fit, posX, posY);
-  const cells = sampleToGrid(raster, rect, gridW, gridH, grid === 'offset');
+  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX);
 
   applyAdjustments(cells, { brightness, contrast, saturation });
   removeBackground(cells, gridW, gridH, backgroundTolerance);
@@ -56,6 +76,7 @@ export function buildPattern(raster, settings) {
     gridW,
     gridH,
     grid,
+    rowShift: rowShift || 0,
     cellAspect,
     indices,
     colors,
@@ -63,6 +84,7 @@ export function buildPattern(raster, settings) {
     symbols,
     total,
     empty: gridW * gridH - total,
+    spanX,
     sourceCells: cells,
     sourceRect: rect,
   };

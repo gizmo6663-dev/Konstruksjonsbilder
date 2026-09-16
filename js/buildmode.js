@@ -1,7 +1,7 @@
 // Byggemodus: gå gjennom mønsteret rad for rad og hak av det du har lagt.
 
 import { drawPattern, patternPixelSize } from './render.js';
-import { cellIndex, patternSignature } from './pattern.js';
+import { cellIndex, patternSignature, rowShiftOf } from './pattern.js';
 import { contrastTextColor } from './color.js';
 
 const STORAGE_PREFIX = 'konstruksjonsbilder:fremdrift:';
@@ -200,7 +200,7 @@ export class BuildMode {
     const py = ((e.clientY - rect.top) / rect.height) * this.canvas.height / this._dpr;
     const y = Math.floor(py / cellH);
     if (y < 0 || y >= p.gridH) return;
-    const shift = p.grid === 'offset' && y % 2 === 1 ? cell * 0.5 : 0;
+    const shift = rowShiftOf(p, y) * cell;
     const x = Math.floor((px - shift) / cell);
     if (x < 0 || x >= p.gridW) return;
     const i = cellIndex(p, x, y);
@@ -274,10 +274,11 @@ export class BuildMode {
     }
 
     this.runsEl.innerHTML = '';
-    if (p.grid === 'offset' && y % 2 === 1) {
+    const shift = rowShiftOf(p, y);
+    if (shift > 0.001) {
       const note = document.createElement('li');
       note.className = 'bm__run bm__run--note';
-      note.textContent = 'Denne raden er forskjøvet en halv brikke mot høyre.';
+      note.textContent = `Denne raden starter ${Math.round(shift * 100)} % av en brikkebredde inn mot høyre.`;
       this.runsEl.appendChild(note);
     }
     for (const run of runs) {

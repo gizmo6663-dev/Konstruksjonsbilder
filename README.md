@@ -46,10 +46,34 @@ Konverteringen gjøres i noen klart adskilte steg:
    Det gir langt bedre treff enn å måle avstand i RGB.
 4. **Dithering** (`js/quantize.js`) – valgfri feilspredning (Floyd–Steinberg
    eller Atkinson) i serpentinrekkefølge, slik at toneoverganger ikke blir flate.
-5. **Rutenettgeometri** (`js/pattern.js`, `js/render.js`) – kvadratisk rutenett
-   for perler og liggende LEGO, forskjøvet rutenett for Plus-Plus der annenhver
-   rad forskyves en halv brikke og radene ligger en halv brikkehøyde fra
-   hverandre, og rektangulære ruter for oppreist LEGO.
+5. **Rutenettgeometri** (`js/pattern.js`, `js/render.js`) – rutenettet er et
+   gitter der hver rad kan være forskjøvet sidelengs, uttrykt som `rowShift`:
+   andelen av en rutebredde raden flyttes i forhold til raden over.
+   0 gir rette kolonner (perler, liggende LEGO, oppreist LEGO), og
+   0,2 gir Plus-Plus sin fletting. Forskyvningen er kumulativ.
+
+### Plus-Plus-gitteret
+
+En Plus-Plus-brikke er ikke et plusstegn, men to plusstegn smeltet sammen – en
+bred H der tverrstreken stikker ut på hver side. I enhetsruter:
+
+```
+. # . # .
+# # # # #
+. # . # .
+```
+
+Formen er 5 enheter bred, 3 høy og dekker 9 ruter. Lagt ende mot ende i en rad
+er det 5 enheter mellom brikkene; neste rad ligger 2 enheter ned og 1 enhet
+sidelengs, slik at bumpene griper ned i raden over. Derfor er rutebredden
+5 enheter, radhøyden 2, og `rowShift` 1/5. Det gir ett lite hull per brikke,
+som er slik en flat Plus-Plus-flate faktisk ser ut.
+
+Et polyomino med n ruter flislegger planet med et gitter nettopp når de n
+rutene havner i hver sin sideklasse av gitteret. Kjører man den testen over
+alle gitre med determinant 9, finnes det bare to som dekker denne brikka helt
+uten hull – og de er speilbilder av hverandre. Begge gir en flate der hver rad
+er forskjøvet 4/9 brikkebredde, med trappetrinnkanter.
 
 Brikkeformen har bare én kilde: brikkemålene i millimeter (`pitch`). Forholdet
 mellom bredde og høyde bestemmer formen på pikslene, og de samme tallene gir
