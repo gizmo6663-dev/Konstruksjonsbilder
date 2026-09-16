@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Konstruksjonsbilder – byggemaler fra egne bilder</title>
+<meta name="description" content="Gjør et bilde om til en byggemal for strykeperler, LEGO eller Plus-Plus. Alt skjer i nettleseren – bildene lastes aldri opp.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='8' height='8' fill='%23e8543f'/><rect x='8' width='8' height='8' fill='%23f2b705'/><rect y='8' width='8' height='8' fill='%233a86ff'/><rect x='8' y='8' width='8' height='8' fill='%2338b000'/></svg>">
+</head>
+<body>
+
+<noscript>
+  <p style="padding:24px;font:16px system-ui,sans-serif">
+    Denne appen konverterer bildene i nettleseren din og trenger derfor JavaScript.
+    Slå det på for å lage byggemaler.
+  </p>
+</noscript>
+
+<div id="app">
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>Konstruksjonsbilder</h1>
+        <p>Lag byggemaler av egne bilder – til perler, LEGO og Plus-Plus</p>
+      </div>
+    </div>
+    <p class="topbar__privacy">Bildene behandles i nettleseren din og sendes ingen steder.</p>
+  </header>
+
+  <main class="layout">
+    <!-- ── Venstre kolonne: innstillinger ───────────────────────────── -->
+    <div class="panel panel--controls">
+
+      <section class="card" id="card-image">
+        <h2><span class="step">1</span> Bilde</h2>
+        <label class="dropzone" id="dropzone" tabindex="0">
+          <input type="file" id="file-input" accept="image/*" hidden>
+          <span class="dropzone__icon" aria-hidden="true">🖼️</span>
+          <span class="dropzone__title">Velg eller slipp et bilde her</span>
+          <span class="dropzone__hint">JPG, PNG, WebP, GIF eller SVG</span>
+        </label>
+        <div class="row row--split">
+          <button class="btn btn--ghost btn--sm" id="btn-example">Prøv et eksempel</button>
+          <span class="muted" id="image-info"></span>
+        </div>
+      </section>
+
+      <section class="card" id="card-material">
+        <h2><span class="step">2</span> Materiale</h2>
+        <div class="materials" id="materials" role="radiogroup" aria-label="Materiale"></div>
+        <p class="material-desc muted" id="material-desc"></p>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">3</span> Størrelse</h2>
+        <label class="field">
+          <span>Ferdige mål</span>
+          <select id="preset"></select>
+        </label>
+        <div class="row row--two">
+          <label class="field">
+            <span>Bredde <em id="unit-w">ruter</em></span>
+            <input type="number" id="grid-w" min="4" max="300" step="1">
+          </label>
+          <label class="field">
+            <span>Høyde <em id="unit-h">ruter</em></span>
+            <input type="number" id="grid-h" min="4" max="300" step="1">
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="lock-ratio" checked> Behold bildets proporsjoner</label>
+
+        <label class="field">
+          <span>Utsnitt</span>
+          <select id="fit">
+            <option value="cover">Fyll hele flaten (beskjærer bildet)</option>
+            <option value="contain">Få med hele bildet (tomme marger)</option>
+          </select>
+        </label>
+        <div id="position-controls">
+          <label class="field field--slider">
+            <span>Forskyv vannrett <output id="out-posx">midt</output></span>
+            <input type="range" id="pos-x" min="0" max="100" value="50">
+          </label>
+          <label class="field field--slider">
+            <span>Forskyv loddrett <output id="out-posy">midt</output></span>
+            <input type="range" id="pos-y" min="0" max="100" value="50">
+          </label>
+        </div>
+
+        <details class="details" id="size-advanced">
+          <summary>Brikkemål og form</summary>
+          <div class="row row--two">
+            <label class="field">
+              <span>Bredde per brikke (mm)</span>
+              <input type="number" id="pitch-w" min="1" max="100" step="0.5">
+            </label>
+            <label class="field">
+              <span>Høyde per brikke (mm)</span>
+              <input type="number" id="pitch-h" min="1" max="100" step="0.5">
+            </label>
+          </div>
+          <label class="field field--slider" id="aspect-field">
+            <span>Brikkeform (bredde ÷ høyde) <output id="out-aspect">1,00</output></span>
+            <input type="range" id="cell-aspect" min="50" max="300" value="100">
+          </label>
+          <p class="muted small" id="aspect-note"></p>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">4</span> Justering</h2>
+        <label class="field">
+          <span>Fargeoverganger (dithering)</span>
+          <select id="dither"></select>
+        </label>
+        <p class="muted small" id="dither-hint"></p>
+
+        <label class="field field--slider">
+          <span>Lysstyrke <output id="out-brightness">0</output></span>
+          <input type="range" id="brightness" min="-40" max="40" value="0">
+        </label>
+        <label class="field field--slider">
+          <span>Kontrast <output id="out-contrast">0</output></span>
+          <input type="range" id="contrast" min="-50" max="80" value="0">
+        </label>
+        <label class="field field--slider">
+          <span>Metning <output id="out-saturation">0</output></span>
+          <input type="range" id="saturation" min="-100" max="100" value="0">
+        </label>
+        <label class="field field--slider">
+          <span>Fjern bakgrunn <output id="out-bg">av</output></span>
+          <input type="range" id="bg-tolerance" min="0" max="60" value="0">
+        </label>
+        <p class="muted small">Bakgrunnsfjerning sammenligner med fargen i hjørnene. Tomme ruter hoppes over i mal og byggeliste.</p>
+        <button class="btn btn--ghost btn--sm" id="btn-reset-adjust">Nullstill justeringer</button>
+      </section>
+
+      <section class="card">
+        <h2><span class="step">5</span> Farger jeg har</h2>
+        <p class="muted small" id="palette-note"></p>
+        <div id="palette-groups" class="palette-groups"></div>
+        <div class="row row--split">
+          <button class="btn btn--ghost btn--sm" id="btn-all-colors">Velg alle</button>
+          <button class="btn btn--ghost btn--sm" id="btn-limit-colors">Begrens antall farger…</button>
+        </div>
+        <div class="swatches" id="swatches"></div>
+        <div id="custom-palette" hidden>
+          <button class="btn btn--ghost btn--sm" id="btn-add-color">+ Legg til farge</button>
+        </div>
+      </section>
+
+      <section class="card card--tips">
+        <h2>Tips for <span id="tips-material">materialet</span></h2>
+        <ul id="tips"></ul>
+      </section>
+    </div>
+
+    <!-- ── Høyre kolonne: resultat ──────────────────────────────────── -->
+    <div class="panel panel--preview">
+      <div class="preview-head">
+        <div class="viewtabs" role="tablist">
+          <button class="viewtab is-active" data-view="pattern" role="tab">Mønster</button>
+          <button class="viewtab" data-view="original" role="tab">Original</button>
+          <button class="viewtab" data-view="split" role="tab">Side om side</button>
+        </div>
+        <div class="preview-opts">
+          <label class="check check--inline"><input type="checkbox" id="show-grid"> Rutenett</label>
+          <label class="check check--inline"><input type="checkbox" id="show-symbols"> Symboler</label>
+        </div>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="stage__empty" id="stage-empty">
+          <p>Velg et bilde for å komme i gang.</p>
+        </div>
+        <div class="stage__canvases" id="stage-canvases" hidden>
+          <figure class="stage__fig" id="fig-original" hidden>
+            <canvas id="canvas-original"></canvas>
+            <figcaption>Original</figcaption>
+          </figure>
+          <figure class="stage__fig" id="fig-pattern">
+            <canvas id="canvas-pattern"></canvas>
+            <figcaption id="pattern-caption">Mønster</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <div class="stats" id="stats" hidden></div>
+
+      <div class="actions" id="actions" hidden>
+        <button class="btn btn--primary" id="btn-print">Skriv ut / lagre som PDF</button>
+        <button class="btn" id="btn-build">Byggemodus</button>
+        <div class="dropdown">
+          <button class="btn" id="btn-download">Last ned bilde ▾</button>
+          <div class="dropdown__menu" id="download-menu" hidden>
+            <button data-dl="large">Stort mønsterbilde (PNG)</button>
+            <button data-dl="raw">1 piksel per brikke (PNG)</button>
+            <button data-dl="list">Fargeliste (tekst)</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="card card--legend" id="legend-card" hidden>
+        <summary><h2>Fargeliste og antall</h2></summary>
+        <table class="legend" id="legend"></table>
+      </details>
+    </div>
+  </main>
+
+  <footer class="sitefoot">
+    <p>Laget for å bygge ting sammen. Fargeverdiene er tilnærminger for skjerm – ekte perler og klosser kan avvike noe.</p>
+  </footer>
+</div>
+
+<!-- Utskriftsdialog -->
+<dialog id="print-dialog" class="dialog">
+  <form method="dialog">
+    <h2>Utskriftsmal</h2>
+    <label class="field">
+      <span>Tittel på malen</span>
+      <input type="text" id="print-title" maxlength="60" placeholder="Byggemal">
+    </label>
+    <label class="field">
+      <span>Rutestørrelse på papir</span>
+      <select id="print-cell"></select>
+    </label>
+    <label class="check"><input type="checkbox" id="print-color" checked> Skriv ut i farger</label>
+    <label class="check"><input type="checkbox" id="print-symbols" checked> Vis symbol i hver rute</label>
+    <label class="check"><input type="checkbox" id="print-overlap" checked> Overlapp én rute mellom sidene</label>
+    <p class="muted small" id="print-estimate"></p>
+    <menu class="dialog__actions">
+      <button value="cancel" class="btn btn--ghost">Avbryt</button>
+      <button value="print" class="btn btn--primary" id="print-go">Åpne utskrift</button>
+    </menu>
+  </form>
+</dialog>
+
+<div id="build-root" hidden></div>
+<div id="print-root" aria-hidden="true"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
