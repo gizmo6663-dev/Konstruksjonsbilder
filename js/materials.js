@@ -128,30 +128,33 @@ export const MATERIALS = [
     name: 'Plus-Plus',
     short: 'Plus-Plus',
     icon: 'plus',
-    description: 'Plus-Plus-brikker lagt flatt, nestet i hverandre.',
+    description: 'Plus-Plus-brikker lagt flatt, flettet tett uten hull.',
     palette: 'plusplus',
     grid: 'lattice',
-    // Brikka er en bred H – to plusstegn smeltet sammen – 5 enheter bred og
-    // 3 høy. Lagt ende mot ende i en rad er det 5 enheter mellom brikkene.
-    // Neste rad ligger 2 enheter ned og 1 enhet sidelengs, så bumpene griper
-    // inn i raden over. Derfor: rutebredde 5 enheter, radhøyde 2, og hver rad
-    // forskjøvet 1/5 brikkebredde.
-    rowShift: 0.2,
+    // Brikka er en bred H - to plusstegn smeltet sammen - 5 enheter bred og
+    // 3 hoey, 9 ruter i alt. Dette er den tette flisleggingen: i samme
+    // vannrette linje ligger brikkene 9 enheter fra hverandre, og hver rad er
+    // 1 enhet ned og 4 enheter sidelengs. Ingen hull, men trappetrinnkanter.
+    unitCols: 9,
+    pieceUnits: { w: 5, h: 3 },
+    rowShift: 4 / 9,
     fixedShape: true,
     style: 'plus',
     unit: 'brikke',
     unitPlural: 'brikker',
-    // Én enhet er ca. 4 mm, så brikka blir ca. 20 mm bred og radene 8 mm.
-    pitch: { w: 20, h: 8 },
+    // Én enhet er ca. 4 mm, så brikka blir ca. 20 mm bred.
+    // Ruta er 9 enheter bred og 1 enhet høy: 36 × 4 mm.
+    pitch: { w: 36, h: 4 },
     presets: [
-      { name: 'Lite – 16 brikker bredt', w: 16, h: 40 },
-      { name: 'Mellom – 24 brikker bredt', w: 24, h: 60 },
-      { name: 'Stort – 32 brikker bredt', w: 32, h: 80 },
+      { name: 'Lite – ca. 20 cm bredt', w: 6, h: 50 },
+      { name: 'Mellom – ca. 30 cm bredt', w: 8, h: 75 },
+      { name: 'Stort – ca. 40 cm bredt', w: 11, h: 100 },
     ],
     tips: [
-      'Brikkene kobles ende mot ende i rette rader. Neste rad legges en femtedels brikke inn mot høyre, slik at bumpene griper ned i raden over – det er den forskyvningen malen er tegnet med.',
-      'Hver femte rad står rett under den første igjen. Mister du takten, tell deg tilbake dit.',
-      'Måler brikkene dine noe annet enn 20 mm brede, endre tallet under Brikkemål – da blir ferdigmålet og 1:1-utskriften riktig.',
+      'Dette er den tette flettingen: brikkene dekker flaten helt, uten hull. Til gjengjeld blir kantene trappetrinn – de blir ikke rette.',
+      'Hver rad ligger én enhet ned og fire enheter til høyre for raden over. I samme vannrette linje er det ni enheter mellom brikkene, og mellomrommet fylles av brikkene fra radene rundt.',
+      'Etter ni rader står mønsteret rett under seg selv igjen. Mister du takten, tell deg tilbake dit.',
+      'Måler brikkene dine noe annet enn 20 mm brede, endre tallene under Brikkemål – ruta er 9/5 av en brikkebredde bred og 1/5 høy.',
     ],
   },
   {

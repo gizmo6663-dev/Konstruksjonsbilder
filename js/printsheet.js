@@ -2,7 +2,7 @@
 // over flere sider. Brukes både til «Skriv ut» og til «Lagre som PDF» i
 // nettleserens utskriftsdialog.
 
-import { cellIndex, rowShiftOf, gridSpanX } from './pattern.js';
+import { cellIndex, rowShiftOf, gridSpanX, overhangY, PLUSPLUS_OUTLINE } from './pattern.js';
 import { contrastTextColor } from './color.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -71,8 +71,9 @@ function autoCellMm(pattern) {
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
   const spanX = gridSpanX(pattern);
   const aspect = pattern.cellAspect || 1;
+  const over = overhangY(pattern);
   for (const mm of [12, 10, 9, 8, 7, 6, 5]) {
-    if (spanX * mm <= availW && pattern.gridH * (mm / aspect) <= availH) return mm;
+    if (spanX * mm <= availW && pattern.gridH * (mm / aspect) + over * mm <= availH) return mm;
   }
   return 6;
 }
@@ -94,7 +95,7 @@ export function buildPrintSheets(pattern, opts) {
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
   const extra = gridSpanX(pattern) - pattern.gridW;
   const colsPerPage = Math.max(1, Math.floor(availW / cellMm - extra));
-  const rowsPerPage = Math.max(1, Math.floor(availH / cellHMm));
+  const rowsPerPage = Math.max(1, Math.floor((availH - overhangY(pattern) * cellMm) / cellHMm));
 
   const overlap = opts.overlap ? 1 : 0;
   const stepX = Math.max(1, colsPerPage - overlap);
@@ -165,7 +166,9 @@ function buildOverviewPage(pattern, opts, info) {
       facts.push('Skriv ut uten skalering, og mål kontrollinjalen nederst.');
     }
     if (pattern.rowShift) {
-      facts.push(`Hver rad er forskjøvet ${fmt(pattern.rowShift * 100)} % av en brikkebredde mot høyre.`);
+      facts.push(pattern.unitCols
+        ? `Hver rad er forskjøvet ${Math.round(pattern.rowShift * pattern.unitCols)} av ${pattern.unitCols} enheter mot høyre.`
+        : `Hver rad er forskjøvet ${fmt(pattern.rowShift * 100)} % av en rutebredde mot høyre.`);
     }
 
     facts.forEach((t, i) => {
@@ -217,7 +220,7 @@ function buildGridPage(pattern, opts, t) {
   const rows = y1 - y0;
   const extra = gridSpanX(pattern) - pattern.gridW;
   const gridW = (cols + extra) * cellMm;
-  const gridH = rows * cellHMm;
+  const gridH = rows * cellHMm + overhangY(pattern) * cellMm;
   const ox = M + LABEL;
   const oy = M + HEADER_H + LABEL;
 
@@ -231,8 +234,13 @@ function buildGridPage(pattern, opts, t) {
 
   // Minikart som viser hvor på motivet denne siden hører hjemme.
   if (t.total > 1) {
-    const mw = 22;
-    const mh = mw * (pattern.gridH / pattern.gridW);
+    // Minikartet må følge motivets fysiske form, ikke antall ruter: med en
+    // rute som er 9 ganger bredere enn høy ville 11 × 99 ruter gitt et kart
+    // ni ganger for høyt.
+    const shape = (gridSpanX(pattern) * (pattern.cellAspect || 1)) / pattern.gridH;
+    let mw = 22;
+    let mh = mw / shape;
+    if (mh > 26) { mh = 26; mw = mh * shape; }
     const mx = PAGE.w - M - mw;
     const my = M + 1;
     svg.appendChild(el('rect', { x: mx, y: my, width: mw, height: mh, fill: '#fff', stroke: '#999', 'stroke-width': 0.25 }));
@@ -245,8 +253,14 @@ function buildGridPage(pattern, opts, t) {
     }));
   }
 
-  const showSymbols = opts.symbols !== false && Math.min(cellMm, cellHMm) >= 4;
-  const fontSize = Math.min(cellMm, cellHMm) * 0.62;
+  const piece = !!(pattern.pieceUnits && pattern.unitCols);
+  // For brikker med egen form er det brikkas stoerrelse som avgjoer lesbarhet,
+  // ikke rutas.
+  const pieceMm = piece
+    ? Math.min(pattern.pieceUnits.w, pattern.pieceUnits.h) * (cellMm / pattern.unitCols)
+    : Math.min(cellMm, cellHMm);
+  const showSymbols = opts.symbols !== false && pieceMm >= 4;
+  const fontSize = pieceMm * 0.62;
 
   const cellsGroup = el('g', {});
   for (let y = y0; y < y1; y++) {
@@ -259,23 +273,42 @@ function buildGridPage(pattern, opts, t) {
 
       if (pi < 0) {
         // Tom rute markeres med en diagonal strek så den ikke forveksles med hvit.
+        const w = piece ? pattern.pieceUnits.w * (cellMm / pattern.unitCols) : cellMm;
+        const h = piece ? pattern.pieceUnits.h * (cellMm / pattern.unitCols) : cellHMm;
         cellsGroup.appendChild(el('line', {
-          x1: px + cellMm * 0.25, y1: py + cellHMm * 0.25,
-          x2: px + cellMm * 0.75, y2: py + cellHMm * 0.75,
+          x1: px + w * 0.25, y1: py + h * 0.25,
+          x2: px + w * 0.75, y2: py + h * 0.75,
           stroke: '#bbb', 'stroke-width': 0.25,
         }));
         continue;
       }
       const color = pattern.colors[pi];
+      // Brikker som ikke fyller ruta si (Plus-Plus) tegnes med sin egen form.
+      // Et rektangel ville her vaere en 36 x 4 mm stripe uten sammenheng med
+      // brikka, og malen ville vaere umulig aa bygge etter.
+      const u = piece ? cellMm / pattern.unitCols : 0;
       if (opts.colorPrint !== false) {
-        cellsGroup.appendChild(el('rect', {
-          x: px, y: py, width: cellMm, height: cellHMm,
-          fill: color.hex, 'fill-opacity': inOverlap ? 0.35 : 1,
+        cellsGroup.appendChild(piece
+          ? el('path', {
+              d: outlinePath(px, py, u),
+              fill: color.hex, 'fill-opacity': inOverlap ? 0.35 : 1,
+              stroke: '#111', 'stroke-width': 0.18, 'stroke-linejoin': 'round',
+            })
+          : el('rect', {
+              x: px, y: py, width: cellMm, height: cellHMm,
+              fill: color.hex, 'fill-opacity': inOverlap ? 0.35 : 1,
+            }));
+      } else if (piece) {
+        cellsGroup.appendChild(el('path', {
+          d: outlinePath(px, py, u), fill: 'none',
+          stroke: '#111', 'stroke-width': 0.18, 'stroke-linejoin': 'round',
         }));
       }
       if (showSymbols) {
+        const sx = piece ? px + (pattern.pieceUnits.w / 2) * u : px + cellMm / 2;
+        const sy = piece ? py + (pattern.pieceUnits.h / 2) * u : py + cellHMm / 2;
         cellsGroup.appendChild(el('text', {
-          x: px + cellMm / 2, y: py + cellHMm / 2 + fontSize * 0.36,
+          x: sx, y: sy + fontSize * 0.36,
           class: 'p-cell', 'font-size': fontSize,
           fill: opts.colorPrint !== false ? contrastTextColor(color.hex) : '#000',
           'fill-opacity': inOverlap ? 0.4 : 1,
@@ -285,7 +318,8 @@ function buildGridPage(pattern, opts, t) {
   }
   svg.appendChild(cellsGroup);
 
-  // Rutenett.
+  // Rutenett. Der brikkene har egen form, tegner omrissene strukturen selv –
+  // da holder det med hjelpelinjer hver femte rad.
   const thin = el('path', { stroke: '#8a8a8a', 'stroke-width': 0.12, fill: 'none' });
   const thick = el('path', { stroke: '#111', 'stroke-width': 0.4, fill: 'none' });
   let dThin = '';
@@ -294,9 +328,12 @@ function buildGridPage(pattern, opts, t) {
   for (let y = y0; y <= y1; y++) {
     const py = oy + (y - y0) * cellHMm;
     const seg = `M${ox} ${py}H${ox + gridW}`;
-    (y % 5 === 0 || y === y0 || y === y1 ? (dThick += seg) : (dThin += seg));
+    if (y % 5 === 0 || y === y0 || y === y1) dThick += seg;
+    else if (!piece) dThin += seg;
   }
-  if (!pattern.rowShift) {
+  if (piece) {
+    // ingen loddrette hjelpelinjer – de ville ikke fulgt brikkene
+  } else if (!pattern.rowShift) {
     for (let x = x0; x <= x1; x++) {
       const px = ox + (x - x0) * cellMm;
       const seg = `M${px} ${oy}V${oy + gridH}`;
@@ -358,6 +395,20 @@ function rulerGroup(x, y) {
   return g;
 }
 
+function round(v) {
+  return Math.round(v * 100) / 100;
+}
+
+/** Brikkeomrisset som SVG-bane, med øvre venstre hjørne i (x, y). */
+function outlinePath(x, y, u) {
+  let d = '';
+  for (let i = 0; i < PLUSPLUS_OUTLINE.length; i++) {
+    const [ox, oy] = PLUSPLUS_OUTLINE[i];
+    d += `${i ? 'L' : 'M'}${round(x + ox * u)} ${round(y + oy * u)}`;
+  }
+  return d + 'Z';
+}
+
 function trunc(s, n) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
@@ -374,7 +425,7 @@ export function estimateSheets(pattern, opts = {}) {
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
   const extra = gridSpanX(pattern) - pattern.gridW;
   const colsPerPage = Math.max(1, Math.floor(availW / cellMm - extra));
-  const rowsPerPage = Math.max(1, Math.floor(availH / cellHMm));
+  const rowsPerPage = Math.max(1, Math.floor((availH - overhangY(pattern) * cellMm) / cellHMm));
   const overlap = opts.overlap ? 1 : 0;
   const stepX = Math.max(1, colsPerPage - overlap);
   const stepY = Math.max(1, rowsPerPage - overlap);

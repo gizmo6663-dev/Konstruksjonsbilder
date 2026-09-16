@@ -91,22 +91,25 @@ export function computeSourceRect(srcW, srcH, targetAspect, fit, posX = 0.5, pos
  *
  * Returnerer sRGB-float i [0,1] pluss alfa per rute.
  */
-export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW) {
+export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW, box = null) {
   const { width: sw, height: sh, linear } = raster;
   const out = new Float32Array(gridW * gridH * 4);
   const cellW = rect.w / spanX;
   const cellH = rect.h / gridH;
+  // Boksen vi henter farge fra, regnet fra rutas øvre venstre hjørne.
+  const boxW = box ? box.w * cellW : cellW;
+  const boxH = box ? box.h * cellW : cellH;
 
   for (let gy = 0; gy < gridH; gy++) {
     const shift = rowShift ? ((gy * rowShift) % 1) * cellW : 0;
     const fy0 = rect.y + gy * cellH;
-    const fy1 = fy0 + cellH;
+    const fy1 = fy0 + boxH;
     const y0 = Math.max(0, Math.floor(fy0));
     const y1 = Math.min(sh, Math.ceil(fy1));
 
     for (let gx = 0; gx < gridW; gx++) {
       const fx0 = rect.x + gx * cellW + shift;
-      const fx1 = fx0 + cellW;
+      const fx1 = fx0 + boxW;
       const x0 = Math.max(0, Math.floor(fx0));
       const x1 = Math.min(sw, Math.ceil(fx1));
 
@@ -134,7 +137,7 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
       const o = (gy * gridW + gx) * 4;
       if (wsum > 0) {
         // Utsnitt som stikker utenfor bildet regnes som tomt, ikke som svart.
-        const coverage = wsum / (cellW * cellH);
+        const coverage = wsum / (boxW * boxH);
         const alpha = (a / wsum) * Math.min(1, coverage);
         if (a > 1e-6) {
           out[o] = linearToSrgb(r / a);

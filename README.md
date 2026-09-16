@@ -15,9 +15,13 @@ Alt skjer lokalt i nettleseren. Bildene lastes aldri opp noe sted.
   hver piksel: en plate sett ovenfra er 8 × 8 mm, mens forsiden av en kloss i
   en vegg er 8 × 9,6 mm. Uten det valget blir et oppreist motiv strukket 20 %
   på høyden.
-- **Velg størrelse** – ferdige mål som ett perlebrett (29 × 29) eller en
-  LEGO-byggeplate (32 × 32), eller sett bredde og høyde selv. Appen viser
-  hvor stort det ferdige bildet blir i centimeter.
+- **Velg størrelse** – ferdige mål som ett perlebrett eller en LEGO-byggeplate,
+  eller sett bredde og høyde selv. Med «Behold bildets proporsjoner» kan begge
+  feltene styre: skriver du bredden følger høyden etter, og omvendt. For et
+  høyt motiv er det høyden man vil låse – setter du den til 25, krymper
+  bredden tilsvarende, og hele motivet holder seg innenfor ett brett.
+  Størrelsesvalget er et tak motivet legges inn i, ikke en fast bredde.
+  Appen viser hvor stort det ferdige bildet blir i centimeter.
 - **Juster** – lysstyrke, kontrast, metning, dithering og bakgrunnsfjerning.
   Du kan også begrense antallet farger, eller skru av fargene du ikke har.
 - **Få ut malen**:
@@ -63,21 +67,26 @@ bred H der tverrstreken stikker ut på hver side. I enhetsruter:
 . # . # .
 ```
 
-Formen er 5 enheter bred, 3 høy og dekker 9 ruter. Lagt ende mot ende i en rad
-er det 5 enheter mellom brikkene; neste rad ligger 2 enheter ned og 1 enhet
-sidelengs, slik at bumpene griper ned i raden over. Derfor er rutebredden
-5 enheter, radhøyden 2, og `rowShift` 1/5. Det gir ett lite hull per brikke,
-som er slik en flat Plus-Plus-flate faktisk ser ut.
+Formen er 5 enheter bred, 3 høy og dekker 9 ruter. Den legges i den tette
+flisleggingen: i samme vannrette linje ligger brikkene 9 enheter fra hverandre,
+og hver rad er 1 enhet ned og 4 enheter sidelengs. Det gir en flate helt uten
+hull, med trappetrinnkanter. Derfor er ruta 9 enheter bred og 1 høy, og
+`rowShift` er 4/9.
 
 Et polyomino med n ruter flislegger planet med et gitter nettopp når de n
 rutene havner i hver sin sideklasse av gitteret. Kjører man den testen over
-alle gitre med determinant 9, finnes det bare to som dekker denne brikka helt
-uten hull – og de er speilbilder av hverandre. Begge gir en flate der hver rad
-er forskjøvet 4/9 brikkebredde, med trappetrinnkanter.
+alle gitre med determinant 9, finnes det bare to som dekker denne brikka helt –
+og de er speilbilder av hverandre.
 
-Brikkeformen har bare én kilde: brikkemålene i millimeter (`pitch`). Forholdet
-mellom bredde og høyde bestemmer formen på pikslene, og de samme tallene gir
-ferdigmålet og 1:1-utskriften. Da kan de ikke komme i utakt med hverandre.
+To ting følger av at brikka bare dekker 9 av rutas 9 × 1 enheter, men i en helt
+annen form enn ruta:
+
+- **Prøvetaking.** Prøvetas ruta som helhet, blir hver brikke gjennomsnittet av
+  en 36 × 4 mm stripe av bildet – ubrukelig. `sampleBox()` gir i stedet brikkas
+  eget fotavtrykk, 5 × 3 enheter, som fargen hentes fra.
+- **Tegning.** Både skjerm og utskrift tegner brikkas omriss, ikke rutas
+  rektangel. En utskrift med 36 × 4 mm rektangler ville vært umulig å bygge
+  etter.
 
 ### Filer
 

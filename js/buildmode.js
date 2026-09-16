@@ -1,7 +1,7 @@
 // Byggemodus: gå gjennom mønsteret rad for rad og hak av det du har lagt.
 
 import { drawPattern, patternPixelSize } from './render.js';
-import { cellIndex, patternSignature, rowShiftOf } from './pattern.js';
+import { cellIndex, patternSignature, rowShiftOf, overhangY } from './pattern.js';
 import { contrastTextColor } from './color.js';
 
 const STORAGE_PREFIX = 'konstruksjonsbilder:fremdrift:';
@@ -278,7 +278,8 @@ export class BuildMode {
     if (shift > 0.001) {
       const note = document.createElement('li');
       note.className = 'bm__run bm__run--note';
-      note.textContent = `Denne raden starter ${Math.round(shift * 100)} % av en brikkebredde inn mot høyre.`;
+      const frac = p.unitCols ? `${Math.round(shift * p.unitCols)} av ${p.unitCols} enheter` : `${Math.round(shift * 100)} %`;
+      note.textContent = `Denne raden starter ${frac} inn mot høyre i forhold til rad 1.`;
       this.runsEl.appendChild(note);
     }
     for (const run of runs) {

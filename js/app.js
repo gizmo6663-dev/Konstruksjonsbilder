@@ -21,6 +21,9 @@ const state = {
   variants: {},
   gridW: START.presets[0].w,
   gridH: START.presets[0].h,
+  // Størrelsesvalget er et tak motivet legges inn i, ikke en fast bredde.
+  box: { w: START.presets[0].w, h: START.presets[0].h },
+  presetIndex: 0,
   lockRatio: true,
   fit: 'cover',
   posX: 0.5,
@@ -110,6 +113,8 @@ function recompute() {
     gridH: state.gridH,
     grid: mat.grid,
     rowShift: mat.rowShift || 0,
+    unitCols: mat.unitCols || 0,
+    pieceUnits: mat.pieceUnits || null,
     cellAspect: cellAspect(),
     fit: state.fit,
     posX: state.posX,
@@ -161,7 +166,7 @@ function renderPreview() {
 
   if (!figPattern.hidden) {
     const { width } = patternPixelSize(pattern, 1);
-    const cell = clamp(Math.floor(budget / width), 2, 32);
+    const cell = clamp(Math.floor(budget / width), 2, maxCell(32));
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const size = patternPixelSize(pattern, cell);
     const canvas = $('#canvas-pattern');
@@ -207,6 +212,16 @@ function drawOriginal(budget) {
     ctx.strokeRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale);
     ctx.restore();
   }
+}
+
+/**
+ * Taket for rutestørrelsen, uttrykt slik at selve brikka blir like stor
+ * uansett materiale. For Plus-Plus er ruta 9 enheter bred mens brikka bare
+ * er 5, så ruta må være tilsvarende større for at brikka skal bli synlig.
+ */
+function maxCell(perPiece) {
+  if (!pattern || !pattern.pieceUnits || !pattern.unitCols) return perPiece;
+  return Math.round(perPiece * (pattern.unitCols / pattern.pieceUnits.w));
 }
 
 function renderStats() {
@@ -279,7 +294,6 @@ function selectMaterial(id, resetSize) {
   buildPresets(currentMaterial());
   buildPaletteUI();
   syncSizeInputs();
-  applyRatioLock();
   scheduleRecompute();
 }
 
@@ -302,8 +316,10 @@ function resetToMaterialDefaults() {
   const mat = resolveMaterial(state.materialId, state.variants[state.materialId]);
   state.pitch = { ...mat.pitch };
   const preset = mat.presets[0];
-  state.gridW = preset.w;
-  state.gridH = preset.h;
+  state.box = { w: preset.w, h: preset.h };
+  state.presetIndex = 0;
+  if (raster && state.lockRatio) fitWithin(preset.w, preset.h);
+  else { state.gridW = preset.w; state.gridH = preset.h; }
 }
 
 function refreshMaterialTexts() {
@@ -325,8 +341,7 @@ function buildPresets(mat) {
   sel.innerHTML =
     '<option value="">Egendefinert</option>' +
     mat.presets.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
-  const match = mat.presets.findIndex((p) => p.w === state.gridW && (state.lockRatio || p.h === state.gridH));
-  sel.value = match >= 0 ? String(match) : '';
+  sel.value = state.presetIndex == null ? '' : String(state.presetIndex);
 }
 
 function buildPaletteUI() {
@@ -380,13 +395,44 @@ function syncSizeInputs() {
   $('#position-controls').hidden = state.fit !== 'cover';
 }
 
-function applyRatioLock() {
-  const h = $('#grid-h');
-  h.disabled = state.lockRatio && !!raster;
-  if (state.lockRatio && raster) {
-    state.gridH = clamp(Math.round((state.gridW * cellAspect()) / imageAspect), 4, 300);
-    h.value = state.gridH;
+/**
+ * Holder rutenettet i takt med bildets proporsjoner.
+ *
+ * Begge feltene kan styre: skriver du bredden, følger høyden etter, og
+ * omvendt. For høye motiv er det høyden man vil låse – da får man et mindre
+ * motiv, men det holder seg innenfor ett brett.
+ *
+ * @param {'w'|'h'} anchor hvilket felt brukeren nettopp satte
+ */
+function applyRatioLock(anchor = 'w') {
+  $('#grid-h').disabled = false;
+  if (!state.lockRatio || !raster) return;
+  const a = cellAspect();
+  if (anchor === 'h') {
+    state.gridW = clamp(Math.round((state.gridH * imageAspect) / a), 4, 300);
+    $('#grid-w').value = state.gridW;
+  } else {
+    state.gridH = clamp(Math.round((state.gridW * a) / imageAspect), 4, 300);
+    $('#grid-h').value = state.gridH;
   }
+}
+
+/** Største rutenett som får plass innenfor maxW × maxH og holder proporsjonene. */
+function fitWithin(maxW, maxH) {
+  if (!raster) {
+    state.gridW = maxW;
+    state.gridH = maxH;
+    return;
+  }
+  const a = cellAspect();
+  let w = maxW;
+  let h = Math.round((w * a) / imageAspect);
+  if (h > maxH) {
+    h = maxH;
+    w = Math.round((h * imageAspect) / a);
+  }
+  state.gridW = clamp(w, 4, 300);
+  state.gridH = clamp(h, 4, 300);
 }
 
 /* ── Hendelser ──────────────────────────────────────────────────────── */
@@ -423,7 +469,6 @@ function wireEvents() {
     refreshMaterialTexts();
     buildPresets(currentMaterial());
     syncSizeInputs();
-    applyRatioLock();
     scheduleRecompute();
   });
 
@@ -431,27 +476,33 @@ function wireEvents() {
     const i = e.target.value;
     if (i === '') return;
     const p = currentMaterial().presets[Number(i)];
-    state.gridW = p.w;
-    if (!state.lockRatio) state.gridH = p.h;
+    // Med låste proporsjoner er størrelsen et tak: motivet legges inn i det,
+    // slik at et høyt bilde krymper i bredden i stedet for å vokse ut av brettet.
+    state.box = { w: p.w, h: p.h };
+    state.presetIndex = Number(i);
+    if (state.lockRatio) fitWithin(p.w, p.h);
+    else { state.gridW = p.w; state.gridH = p.h; }
     syncSizeInputs();
-    applyRatioLock();
     scheduleRecompute();
   });
 
   $('#grid-w').addEventListener('input', (e) => {
     state.gridW = clamp(parseInt(e.target.value, 10) || 4, 4, 300);
-    applyRatioLock();
+    applyRatioLock('w');
+    state.presetIndex = null;
     $('#preset').value = '';
     scheduleRecompute();
   });
   $('#grid-h').addEventListener('input', (e) => {
     state.gridH = clamp(parseInt(e.target.value, 10) || 4, 4, 300);
+    applyRatioLock('h');
+    state.presetIndex = null;
     $('#preset').value = '';
     scheduleRecompute();
   });
   $('#lock-ratio').addEventListener('change', (e) => {
     state.lockRatio = e.target.checked;
-    applyRatioLock();
+    if (state.lockRatio && state.box) { fitWithin(state.box.w, state.box.h); syncSizeInputs(); }
     scheduleRecompute();
   });
   $('#fit').addEventListener('change', (e) => {
@@ -642,7 +693,10 @@ async function loadFile(file) {
     $('#image-info').textContent = `${raster.width} × ${raster.height} px`;
     $('#dropzone').querySelector('.dropzone__title').textContent = file.name || 'Bilde lastet';
     if (!state.print.title) $('#print-title').placeholder = imageName;
-    applyRatioLock();
+    // Nytt bilde legges inn i den valgte størrelsen i stedet for å vokse ut av den.
+    if (state.lockRatio && state.box) fitWithin(state.box.w, state.box.h);
+    else applyRatioLock('w');
+    syncSizeInputs();
     recompute();
   } catch (err) {
     toast(err.message || 'Klarte ikke å lese bildet.');
@@ -731,7 +785,7 @@ function download(kind) {
   const canvas = kind === 'raw'
     ? renderRawCanvas(pattern, '#ffffff')
     : renderToCanvas(pattern, {
-        cell: 20,
+        cell: maxCell(20),
         style: mat.style,
         grid: state.showGrid,
         major: 5,
@@ -767,9 +821,13 @@ function wirePrintDialog() {
     const sheets = tiles === 1
       ? '1 oversiktsside + 1 rutenettside'
       : `1 oversiktsside + ${tiles} rutenettsider (${est.tilesX} × ${est.tilesY})`;
+    // Hvor stort selve rutenettet blir på papiret – skal stemme med brettet.
+    const printW = (pattern.spanX || pattern.gridW) * est.cellMm / 10;
+    const printH = (pattern.gridH * est.cellMm / pattern.cellAspect) / 10;
     const lines = [
       `${est.pages} A4-sider: ${sheets}, `
       + `${num(est.cellMm, 2)} × ${num(est.cellMm / pattern.cellAspect, 2)} mm per rute.`,
+      `Mønsteret blir ${num(printW)} × ${num(printH)} cm på papiret.`,
     ];
     if (trueScale) {
       lines.push('Naturlig størrelse: brettet kan legges rett oppå arket. '
@@ -821,7 +879,7 @@ function doPrint() {
   // Gi nettleseren en runde til å vise varselet før vi bygger sidene.
   requestAnimationFrame(() => {
     const preview = renderToCanvas(pattern, {
-      cell: 6,
+      cell: maxCell(6),
       style: mat.style,
       grid: false,
       background: '#ffffff',

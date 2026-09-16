@@ -4,6 +4,15 @@ import { buildMatcher } from './color.js';
 import { computeSourceRect, sampleToGrid, applyAdjustments, removeBackground } from './imageops.js';
 import { quantize, countColors, assignSymbols } from './quantize.js';
 
+// Omrisset av en Plus-Plus-brikke, i enhetsruter:
+//   . # . # .
+//   # # # # #
+//   . # . # .
+export const PLUSPLUS_OUTLINE = [
+  [1, 0], [2, 0], [2, 1], [3, 1], [3, 0], [4, 0], [4, 1], [5, 1], [5, 2], [4, 2],
+  [4, 3], [3, 3], [3, 2], [2, 2], [2, 3], [1, 3], [1, 2], [0, 2], [0, 1], [1, 1],
+];
+
 // Rutenettet er et gitter: hver rad kan være forskjøvet sidelengs i forhold til
 // raden over. `rowShift` er forskyvningen per rad, som andel av rutebredden.
 // 0 gir rette kolonner; 0,5 gir murforband; 0,2 gir Plus-Plus sin fletting.
@@ -30,6 +39,28 @@ export function cellOriginX(pattern, x, y) {
   return x + rowShiftOf(pattern, y);
 }
 
+/**
+ * Området en brikke faktisk dekker, som multiplum av rutebredden.
+ * null betyr at brikka fyller ruta si (vanlige kvadratiske rutenett).
+ */
+export function sampleBox(pattern) {
+  if (!pattern.pieceUnits || !pattern.unitCols) return null;
+  return {
+    w: pattern.pieceUnits.w / pattern.unitCols,
+    h: pattern.pieceUnits.h / pattern.unitCols,
+  };
+}
+
+/**
+ * Hvor langt brikka stikker nedenfor sin egen rute, i rutebredder.
+ * Brikka tegnes fra rutas øvre venstre hjørne, så overhenget er bare nedover.
+ */
+export function overhangY(pattern) {
+  const box = sampleBox(pattern);
+  if (!box) return 0;
+  return Math.max(0, box.h - 1 / (pattern.cellAspect || 1));
+}
+
 export function cellIndex(pattern, x, y) {
   return y * pattern.gridW + x;
 }
@@ -48,7 +79,7 @@ export function colorAt(pattern, x, y) {
  */
 export function buildPattern(raster, settings) {
   const {
-    gridW, gridH, grid, rowShift, cellAspect, colors,
+    gridW, gridH, grid, rowShift, cellAspect, colors, unitCols, pieceUnits,
     fit, posX, posY,
     brightness, contrast, saturation,
     dither, ditherAmount, backgroundTolerance,
@@ -60,7 +91,11 @@ export function buildPattern(raster, settings) {
   const spanX = gridSpanX({ gridW, gridH, rowShift });
   const targetAspect = (spanX * cellAspect) / gridH;
   const rect = computeSourceRect(raster.width, raster.height, targetAspect, fit, posX, posY);
-  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX);
+  // Brikka dekker ikke hele ruta si. Prøvetas ruta som helhet, blir hver
+  // brikke et gjennomsnitt av en lang, tynn stripe av bildet. Vi prøvetar
+  // derfor brikkas eget fotavtrykk.
+  const box = sampleBox({ unitCols, pieceUnits });
+  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX, box);
 
   applyAdjustments(cells, { brightness, contrast, saturation });
   removeBackground(cells, gridW, gridH, backgroundTolerance);
@@ -77,6 +112,8 @@ export function buildPattern(raster, settings) {
     gridH,
     grid,
     rowShift: rowShift || 0,
+    unitCols: unitCols || 0,
+    pieceUnits: pieceUnits || null,
     cellAspect,
     indices,
     colors,

@@ -1,16 +1,7 @@
 // Tegning av mønsteret på lerret.
 
-import { gridSpanX, cellOriginX, cellIndex, rowShiftOf } from './pattern.js';
+import { gridSpanX, cellOriginX, cellIndex, rowShiftOf, overhangY, PLUSPLUS_OUTLINE } from './pattern.js';
 import { contrastTextColor } from './color.js';
-
-// Omrisset av en Plus-Plus-brikke i enhetsruter:
-//   . # . # .
-//   # # # # #
-//   . # . # .
-const PLUSPLUS_OUTLINE = [
-  [1, 0], [2, 0], [2, 1], [3, 1], [3, 0], [4, 0], [4, 1], [5, 1], [5, 2], [4, 2],
-  [4, 3], [3, 3], [3, 2], [2, 2], [2, 3], [1, 3], [1, 2], [0, 2], [0, 1], [1, 1],
-];
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -30,7 +21,7 @@ export function drawPattern(ctx, pattern, opts = {}) {
   const cellH = cell / (pattern.cellAspect || 1);
   const style = opts.style || 'flat';
   const w = gridSpanX(pattern) * cell;
-  const h = pattern.gridH * cellH;
+  const h = pattern.gridH * cellH + overhangY(pattern) * cell;
 
   ctx.save();
   ctx.clearRect(0, 0, w, h);
@@ -57,14 +48,17 @@ export function drawPattern(ctx, pattern, opts = {}) {
 
       const dimmed = opts.dim && opts.dim.has(idx);
       ctx.globalAlpha = dimmed ? 0.25 : 1;
-      drawCell(ctx, style, px, py, cell, cellH, color.hex);
+      drawCell(ctx, style, px, py, cell, cellH, color.hex, pattern.unitCols || 5);
 
       if (drawSymbols) {
         const sym = opts.symbols.get(pi);
         if (sym) {
+          const u = cell / (pattern.unitCols || 5);
+          const cx = pattern.pieceUnits ? px + (pattern.pieceUnits.w / 2) * u : px + cell / 2;
+          const cy = pattern.pieceUnits ? py + (pattern.pieceUnits.h / 2) * u : py + cellH / 2;
           ctx.fillStyle = contrastTextColor(color.hex);
           ctx.globalAlpha = dimmed ? 0.2 : 0.85;
-          ctx.fillText(sym, px + cell / 2, py + cellH / 2);
+          ctx.fillText(sym, cx, cy);
         }
       }
       ctx.globalAlpha = 1;
@@ -84,7 +78,7 @@ export function drawPattern(ctx, pattern, opts = {}) {
   ctx.restore();
 }
 
-function drawCell(ctx, style, x, y, w, h, hex) {
+function drawCell(ctx, style, x, y, w, h, hex, unitCols) {
   ctx.fillStyle = hex;
   switch (style) {
     case 'bead': {
@@ -120,16 +114,15 @@ function drawCell(ctx, style, x, y, w, h, hex) {
     }
     case 'plus': {
       // Plus-Plus-brikka: en bred H der tverrstreken stikker ut på hver side –
-      // to plusstegn smeltet sammen. Formen er 5 × 3 enheter, mens ruta bare
-      // er radavstanden bred, så brikka griper inn i radene over og under.
-      const u = w / 5;
-      const ph = u * 3;
-      const y0 = y + (h - ph) / 2;
+      // to plusstegn smeltet sammen, 5 × 3 enheter. Ruta er `unitCols` enheter
+      // bred, så brikka fyller sjelden ruta: den strekker seg ned i radene
+      // under og lar naboene fylle resten.
+      const u = w / unitCols;
       ctx.beginPath();
       for (let i = 0; i < PLUSPLUS_OUTLINE.length; i++) {
         const [ox, oy] = PLUSPLUS_OUTLINE[i];
         const px = x + ox * u;
-        const py = y0 + oy * u;
+        const py = y + oy * u;
         i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       }
       ctx.closePath();
@@ -224,7 +217,7 @@ function drawGrid(ctx, pattern, cell, cellH, opts) {
 export function patternPixelSize(pattern, cell) {
   return {
     width: Math.round(gridSpanX(pattern) * cell),
-    height: Math.round(pattern.gridH * (cell / (pattern.cellAspect || 1))),
+    height: Math.round(pattern.gridH * (cell / (pattern.cellAspect || 1)) + overhangY(pattern) * cell),
   };
 }
 
