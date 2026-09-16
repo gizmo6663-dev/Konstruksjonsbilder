@@ -82,11 +82,17 @@ To ting følger av at brikka bare dekker 9 av rutas 9 × 1 enheter, men i en hel
 annen form enn ruta:
 
 - **Prøvetaking.** Prøvetas ruta som helhet, blir hver brikke gjennomsnittet av
-  en 36 × 4 mm stripe av bildet – ubrukelig. `sampleBox()` gir i stedet brikkas
-  eget fotavtrykk, 5 × 3 enheter, som fargen hentes fra.
+  en 36 × 4 mm stripe av bildet – ubrukelig. `sampleBoxes()` gir i stedet de 9
+  rutene brikka faktisk dekker. Den omsluttende 5 × 3-boksen holder ikke: den
+  inneholder 15 ruter, og de 6 som ikke er brikka tilhører nabobrikkene.
 - **Tegning.** Både skjerm og utskrift tegner brikkas omriss, ikke rutas
   rektangel. En utskrift med 36 × 4 mm rektangler ville vært umulig å bygge
   etter.
+
+Forskyvningen gjør også at mønsteret er bredere enn `gridW`: den mest
+forskjøvede raden stikker 8/9 rute utenfor. Forholdsregningen bruker derfor
+`spanX`, ikke `gridW` – ellers blir motivet bredere enn ment og beskåret på
+høyden.
 
 ### Filer
 

@@ -8,6 +8,12 @@ import { quantize, countColors, assignSymbols } from './quantize.js';
 //   . # . # .
 //   # # # # #
 //   . # . # .
+export const PLUSPLUS_CELLS = [
+  [1, 0], [3, 0],
+  [0, 1], [1, 1], [2, 1], [3, 1], [4, 1],
+  [1, 2], [3, 2],
+];
+
 export const PLUSPLUS_OUTLINE = [
   [1, 0], [2, 0], [2, 1], [3, 1], [3, 0], [4, 0], [4, 1], [5, 1], [5, 2], [4, 2],
   [4, 3], [3, 3], [3, 2], [2, 2], [2, 3], [1, 3], [1, 2], [0, 2], [0, 1], [1, 1],
@@ -40,15 +46,18 @@ export function cellOriginX(pattern, x, y) {
 }
 
 /**
- * Området en brikke faktisk dekker, som multiplum av rutebredden.
- * null betyr at brikka fyller ruta si (vanlige kvadratiske rutenett).
+ * Rutene fargen hentes fra, som multiplum av rutebredden, regnet fra rutas
+ * øvre venstre hjørne. null betyr at brikka fyller ruta si.
+ *
+ * For Plus-Plus er dette de 9 rutene brikka faktisk dekker – ikke den
+ * omsluttende 5 × 3-boksen. Boksen inneholder 15 ruter, og de 6 som ikke er
+ * brikka tilhører nabobrikkene: tas de med, blandes nabofargene inn og
+ * motivet blir uskarpt.
  */
-export function sampleBox(pattern) {
-  if (!pattern.pieceUnits || !pattern.unitCols) return null;
-  return {
-    w: pattern.pieceUnits.w / pattern.unitCols,
-    h: pattern.pieceUnits.h / pattern.unitCols,
-  };
+export function sampleBoxes(pattern) {
+  if (!pattern.pieceCells || !pattern.unitCols) return null;
+  const u = 1 / pattern.unitCols;
+  return pattern.pieceCells.map(([cx, cy]) => ({ x: cx * u, y: cy * u, w: u, h: u }));
 }
 
 /**
@@ -56,9 +65,9 @@ export function sampleBox(pattern) {
  * Brikka tegnes fra rutas øvre venstre hjørne, så overhenget er bare nedover.
  */
 export function overhangY(pattern) {
-  const box = sampleBox(pattern);
-  if (!box) return 0;
-  return Math.max(0, box.h - 1 / (pattern.cellAspect || 1));
+  if (!pattern.pieceUnits || !pattern.unitCols) return 0;
+  const pieceH = pattern.pieceUnits.h / pattern.unitCols;
+  return Math.max(0, pieceH - 1 / (pattern.cellAspect || 1));
 }
 
 export function cellIndex(pattern, x, y) {
@@ -79,7 +88,7 @@ export function colorAt(pattern, x, y) {
  */
 export function buildPattern(raster, settings) {
   const {
-    gridW, gridH, grid, rowShift, cellAspect, colors, unitCols, pieceUnits,
+    gridW, gridH, grid, rowShift, cellAspect, colors, unitCols, pieceUnits, pieceCells,
     fit, posX, posY,
     brightness, contrast, saturation,
     dither, ditherAmount, backgroundTolerance,
@@ -94,8 +103,8 @@ export function buildPattern(raster, settings) {
   // Brikka dekker ikke hele ruta si. Prøvetas ruta som helhet, blir hver
   // brikke et gjennomsnitt av en lang, tynn stripe av bildet. Vi prøvetar
   // derfor brikkas eget fotavtrykk.
-  const box = sampleBox({ unitCols, pieceUnits });
-  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX, box);
+  const boxes = sampleBoxes({ unitCols, pieceCells });
+  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX, boxes);
 
   applyAdjustments(cells, { brightness, contrast, saturation });
   removeBackground(cells, gridW, gridH, backgroundTolerance);
@@ -114,6 +123,7 @@ export function buildPattern(raster, settings) {
     rowShift: rowShift || 0,
     unitCols: unitCols || 0,
     pieceUnits: pieceUnits || null,
+    pieceCells: pieceCells || null,
     cellAspect,
     indices,
     colors,

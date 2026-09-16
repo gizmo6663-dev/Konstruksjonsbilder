@@ -11,6 +11,8 @@ import { BuildMode } from './buildmode.js';
 import { contrastTextColor } from './color.js';
 
 const SETTINGS_KEY = 'konstruksjonsbilder:innstillinger:v2';
+const MIN_SIDE = 4;
+const MAX_SIDE = 400;
 const $ = (sel) => document.querySelector(sel);
 
 // Startverdiene kommer fra materialet selv, så det er ett sted å endre dem.
@@ -443,14 +445,44 @@ function syncSizeInputs() {
 function applyRatioLock(anchor = 'w') {
   $('#grid-h').disabled = false;
   if (!state.lockRatio || !raster) return;
-  const a = cellAspect();
   if (anchor === 'h') {
-    state.gridW = clamp(Math.round((state.gridH * imageAspect) / a), 4, 300);
+    state.gridW = deriveWidth(state.gridH);
     $('#grid-w').value = state.gridW;
   } else {
-    state.gridH = clamp(Math.round((state.gridW * a) / imageAspect), 4, 300);
+    state.gridH = deriveHeight(state.gridW);
     $('#grid-h').value = state.gridH;
   }
+}
+
+/**
+ * Hvor langt den mest forskjøvede raden stikker utenfor kolonne 0, i ruter.
+ * Mønsteret er så mye bredere enn `gridW` alene, og forholdsregningen må ta
+ * med det – ellers blir motivet bredere enn ment, og beskåret på høyden.
+ */
+function shiftSpan(gridH) {
+  const shift = currentMaterial().rowShift || 0;
+  if (!shift) return 0;
+  let max = 0;
+  for (let y = 0; y < gridH; y++) {
+    const v = (y * shift) % 1;
+    if (v > max) max = v;
+  }
+  return max;
+}
+
+// Overhenget avhenger av antall rader, som igjen avhenger av overhenget.
+// Det stabiliserer seg med én gang, siden forskyvningen mettes.
+function deriveHeight(gridW) {
+  let h = state.gridH;
+  for (let i = 0; i < 3; i++) {
+    h = clamp(Math.round(((gridW + shiftSpan(h)) * cellAspect()) / imageAspect), MIN_SIDE, MAX_SIDE);
+  }
+  return h;
+}
+
+function deriveWidth(gridH) {
+  const span = (gridH * imageAspect) / cellAspect();
+  return clamp(Math.round(span - shiftSpan(gridH)), MIN_SIDE, MAX_SIDE);
 }
 
 /** Største rutenett som får plass innenfor maxW × maxH og holder proporsjonene. */
@@ -460,15 +492,14 @@ function fitWithin(maxW, maxH) {
     state.gridH = maxH;
     return;
   }
-  const a = cellAspect();
   let w = maxW;
-  let h = Math.round((w * a) / imageAspect);
+  let h = deriveHeight(w);
   if (h > maxH) {
     h = maxH;
-    w = Math.round((h * imageAspect) / a);
+    w = deriveWidth(h);
   }
-  state.gridW = clamp(w, 4, 300);
-  state.gridH = clamp(h, 4, 300);
+  state.gridW = clamp(w, MIN_SIDE, MAX_SIDE);
+  state.gridH = clamp(h, MIN_SIDE, MAX_SIDE);
 }
 
 /* ── Hendelser ──────────────────────────────────────────────────────── */
@@ -524,14 +555,14 @@ function wireEvents() {
   });
 
   $('#grid-w').addEventListener('input', (e) => {
-    state.gridW = clamp(parseInt(e.target.value, 10) || 4, 4, 300);
+    state.gridW = clamp(parseInt(e.target.value, 10) || MIN_SIDE, MIN_SIDE, MAX_SIDE);
     applyRatioLock('w');
     state.presetIndex = null;
     $('#preset').value = '';
     scheduleRecompute();
   });
   $('#grid-h').addEventListener('input', (e) => {
-    state.gridH = clamp(parseInt(e.target.value, 10) || 4, 4, 300);
+    state.gridH = clamp(parseInt(e.target.value, 10) || MIN_SIDE, MIN_SIDE, MAX_SIDE);
     applyRatioLock('h');
     state.presetIndex = null;
     $('#preset').value = '';

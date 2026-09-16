@@ -1,3 +1,5 @@
+import { PLUSPLUS_CELLS } from './pattern.js';
+
 // Materialdefinisjoner: hvordan rutenettet ser ut, hvilken palett som brukes,
 // og hvilke størrelser som er praktiske å bygge.
 //
@@ -137,6 +139,7 @@ export const MATERIALS = [
     // 1 enhet ned og 4 enheter sidelengs. Ingen hull, men trappetrinnkanter.
     unitCols: 9,
     pieceUnits: { w: 5, h: 3 },
+    pieceCells: PLUSPLUS_CELLS,
     rowShift: 4 / 9,
     fixedShape: true,
     style: 'plus',
@@ -145,10 +148,14 @@ export const MATERIALS = [
     // Én enhet er ca. 4 mm, så brikka blir ca. 20 mm bred.
     // Ruta er 9 enheter bred og 1 enhet høy: 36 × 4 mm.
     pitch: { w: 36, h: 4 },
+    // Høyden er et tak, og med 9 enheter bredde mot 1 i høyden trengs det
+    // mange rader: et kvadratisk motiv på 6 ruter bredt er 54 rader høyt.
+    // Takene må være rause, ellers kapper de hvert eneste portrettbilde.
     presets: [
-      { name: 'Lite – ca. 20 cm bredt', w: 6, h: 50 },
-      { name: 'Mellom – ca. 30 cm bredt', w: 8, h: 75 },
-      { name: 'Stort – ca. 40 cm bredt', w: 11, h: 100 },
+      { name: 'Lite – ca. 22 cm bredt', w: 6, h: 160 },
+      { name: 'Mellom – ca. 29 cm bredt', w: 8, h: 210 },
+      { name: 'Stort – ca. 40 cm bredt', w: 11, h: 290 },
+      { name: 'Ekstra stort – ca. 50 cm bredt', w: 14, h: 300 },
     ],
     tips: [
       'Dette er den tette flettingen: brikkene dekker flaten helt, uten hull. Til gjengjeld blir kantene trappetrinn – de blir ikke rette.',

@@ -87,34 +87,43 @@ export function computeSourceRect(srcW, srcH, targetAspect, fit, posX = 0.5, pos
  *
  * Hver rute dekker et rektangel i kildebildet og får gjennomsnittet av det.
  * `rowShift` forskyver hver rad sidelengs, som andel av rutebredden, slik at
- * prøvepunktene treffer der brikkene faktisk havner.
+ * prøvepunktene treffer der brikkene faktisk havner. `boxes` lar en brikke
+ * hente farge fra sitt eget fotavtrykk i stedet for hele ruta.
  *
  * Returnerer sRGB-float i [0,1] pluss alfa per rute.
  */
-export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW, box = null) {
+export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW, boxes = null) {
   const { width: sw, height: sh, linear } = raster;
   const out = new Float32Array(gridW * gridH * 4);
   const cellW = rect.w / spanX;
   const cellH = rect.h / gridH;
-  // Boksen vi henter farge fra, regnet fra rutas øvre venstre hjørne.
-  const boxW = box ? box.w * cellW : cellW;
-  const boxH = box ? box.h * cellW : cellH;
+
+  // Områdene fargen hentes fra, i kildepiksler, regnet fra rutas hjørne.
+  // Uten liste er det ruta selv.
+  const areas = boxes
+    ? boxes.map((b) => ({ x: b.x * cellW, y: b.y * cellW, w: b.w * cellW, h: b.h * cellW }))
+    : [{ x: 0, y: 0, w: cellW, h: cellH }];
+  const areaSum = areas.reduce((t, a) => t + a.w * a.h, 0);
 
   for (let gy = 0; gy < gridH; gy++) {
     const shift = rowShift ? ((gy * rowShift) % 1) * cellW : 0;
-    const fy0 = rect.y + gy * cellH;
-    const fy1 = fy0 + boxH;
-    const y0 = Math.max(0, Math.floor(fy0));
-    const y1 = Math.min(sh, Math.ceil(fy1));
+    const originY = rect.y + gy * cellH;
 
     for (let gx = 0; gx < gridW; gx++) {
-      const fx0 = rect.x + gx * cellW + shift;
-      const fx1 = fx0 + boxW;
-      const x0 = Math.max(0, Math.floor(fx0));
-      const x1 = Math.min(sw, Math.ceil(fx1));
+      const originX = rect.x + gx * cellW + shift;
 
       let r = 0, g = 0, b = 0, a = 0, wsum = 0;
-      if (x1 > x0 && y1 > y0) {
+      for (const area of areas) {
+        const fx0 = originX + area.x;
+        const fy0 = originY + area.y;
+        const fx1 = fx0 + area.w;
+        const fy1 = fy0 + area.h;
+        const x0 = Math.max(0, Math.floor(fx0));
+        const x1 = Math.min(sw, Math.ceil(fx1));
+        const y0 = Math.max(0, Math.floor(fy0));
+        const y1 = Math.min(sh, Math.ceil(fy1));
+        if (x1 <= x0 || y1 <= y0) continue;
+
         for (let y = y0; y < y1; y++) {
           // Delvis dekning langs kanten teller mindre.
           const wy = Math.min(y + 1, fy1) - Math.max(y, fy0);
@@ -137,7 +146,7 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
       const o = (gy * gridW + gx) * 4;
       if (wsum > 0) {
         // Utsnitt som stikker utenfor bildet regnes som tomt, ikke som svart.
-        const coverage = wsum / (boxW * boxH);
+        const coverage = wsum / areaSum;
         const alpha = (a / wsum) * Math.min(1, coverage);
         if (a > 1e-6) {
           out[o] = linearToSrgb(r / a);
