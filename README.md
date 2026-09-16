@@ -131,6 +131,19 @@ til å opprette et Pages-nettsted.
 Appen kan også legges på hvilken som helst annen statisk hosting – den trenger
 bare å serveres over HTTP.
 
+## Lagrede innstillinger
+
+Innstillinger lagres i `localStorage`. Brikkemålene er det geometrien hviler
+på, og de er både materialets egenskap og noe brukeren kan overstyre. Et lagret
+mål huskes derfor per materiale og byggemåte, sammen med standarden det ble satt
+ut fra, og forkastes automatisk hvis materialet siden har endret geometri.
+
+Uten det ville et mål lagret av en eldre versjon overstyrt den nye. Det skjedde
+da Plus-Plus gikk fra 20 × 10 mm til 36 × 4 mm per rute: brikkene ble tegnet
+med riktig form, men lagt ut etter det gamle målet, og mønsteret gikk ikke opp.
+Nøkkelen er også versjonert (`:v2`), så innstillinger fra før denne ordningen
+ignoreres i stedet for å bli tolket feil.
+
 ## Om fargene
 
 Hex-verdiene i palettene er **tilnærminger laget for skjermvisning**. Ekte

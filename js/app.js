@@ -10,7 +10,7 @@ import { buildPrintSheets, estimateSheets, cellSizeOptions } from './printsheet.
 import { BuildMode } from './buildmode.js';
 import { contrastTextColor } from './color.js';
 
-const SETTINGS_KEY = 'konstruksjonsbilder:innstillinger:v1';
+const SETTINGS_KEY = 'konstruksjonsbilder:innstillinger:v2';
 const $ = (sel) => document.querySelector(sel);
 
 // Startverdiene kommer fra materialet selv, så det er ett sted å endre dem.
@@ -34,6 +34,9 @@ const state = {
   dither: 'none',
   bgTolerance: 0,
   pitch: { ...START.pitch },
+  // Egne brikkemål per materiale og byggemåte. Hver oppføring husker hvilken
+  // standard den ble laget fra, så den kan forkastes hvis materialet endres.
+  pitchOverrides: {},
   maxColors: 0,
   enabledGroups: {},
   offColors: new Set(),
@@ -63,6 +66,37 @@ function currentMaterial() {
 
 function cellAspect() {
   return state.pitch.w / state.pitch.h;
+}
+
+function pitchKey(id = state.materialId, variantId = state.variants[state.materialId]) {
+  return `${id}:${variantId || ''}`;
+}
+
+/**
+ * Brikkemålene som skal gjelde nå.
+ *
+ * Brukerens egne verdier ligger lagret mellom økter, men et lagret mål er bare
+ * gyldig så lenge materialets egen standard er den samme som da det ble satt.
+ * Endrer vi geometrien til et materiale – som da Plus-Plus gikk fra 20 × 10 mm
+ * til 36 × 4 mm – ville et gammelt lagret mål ellers overstyre den nye og gi
+ * et mønster som ikke går opp.
+ */
+function resolvePitch() {
+  const base = resolveMaterial(state.materialId, state.variants[state.materialId]).pitch;
+  const saved = state.pitchOverrides[pitchKey()];
+  const stillValid = saved && saved.base
+    && saved.base.w === base.w && saved.base.h === base.h;
+  return stillValid ? { w: saved.w, h: saved.h } : { ...base };
+}
+
+/** Husker brukerens brikkemål sammen med standarden de ble satt ut fra. */
+function rememberPitch() {
+  const base = resolveMaterial(state.materialId, state.variants[state.materialId]).pitch;
+  state.pitchOverrides[pitchKey()] = {
+    w: state.pitch.w,
+    h: state.pitch.h,
+    base: { w: base.w, h: base.h },
+  };
 }
 
 function currentPaletteId() {
@@ -289,6 +323,9 @@ function selectMaterial(id, resetSize) {
   $('#palette-note').textContent = PALETTES[base.palette].note;
 
   buildVariantUI(base);
+  // Brikkemålene settes uansett, også når størrelsen beholdes: de er det
+  // geometrien hviler på, og de kan komme fra en eldre versjon av appen.
+  state.pitch = resolvePitch();
   if (resetSize) resetToMaterialDefaults();
   refreshMaterialTexts();
   buildPresets(currentMaterial());
@@ -314,7 +351,6 @@ function buildVariantUI(base) {
 
 function resetToMaterialDefaults() {
   const mat = resolveMaterial(state.materialId, state.variants[state.materialId]);
-  state.pitch = { ...mat.pitch };
   const preset = mat.presets[0];
   state.box = { w: preset.w, h: preset.h };
   state.presetIndex = 0;
@@ -465,6 +501,7 @@ function wireEvents() {
   // Størrelse
   $('#variant').addEventListener('change', (e) => {
     state.variants[state.materialId] = e.target.value;
+    state.pitch = resolvePitch();
     resetToMaterialDefaults();
     refreshMaterialTexts();
     buildPresets(currentMaterial());
@@ -523,12 +560,14 @@ function wireEvents() {
       $('#pitch-h').value = state.pitch.h;
     }
     state.pitch.w = v;
+    rememberPitch();
     onPitchChanged();
   });
   $('#pitch-h').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
     if (!(v > 0)) return;
     state.pitch.h = v;
+    rememberPitch();
     onPitchChanged();
   });
 
@@ -918,7 +957,10 @@ function loadSettings() {
     Object.assign(state, saved, {
       offColors: new Set(saved.offColors || []),
       variants: saved.variants || {},
-      pitch: saved.pitch || state.pitch,
+      pitchOverrides: saved.pitchOverrides || {},
+      // pitch settes av selectMaterial via resolvePitch() – aldri fra lageret
+      // direkte, ellers overlever gamle mål en endring i materialet.
+      pitch: state.pitch,
       print: { ...state.print, ...(saved.print || {}) },
     });
   } catch { /* ignorer ødelagte innstillinger */ }
