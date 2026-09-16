@@ -76,9 +76,11 @@ python3 -m http.server 8080
 til standardbranchen. Siden appen er ren statisk HTML, CSS og JavaScript,
 lastes repoet opp som det er – ingen bygging.
 
-Workflowen slår på Pages selv første gang den kjører (`configure-pages` med
-`enablement: true`). Skulle det feile, kan det gjøres manuelt under
+Pages må slås på for repoet én gang før første publisering:
 **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Uten det stopper workflowen med `Get Pages site failed … Not Found`.
+Workflowen kan ikke gjøre dette selv – `GITHUB_TOKEN` har ikke rettigheter
+til å opprette et Pages-nettsted.
 
 Appen kan også legges på hvilken som helst annen statisk hosting – den trenger
 bare å serveres over HTTP.

@@ -28,13 +28,13 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Hent koden
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
+      # Feiler med "Get Pages site failed ... Not Found" hvis Pages ikke er
+      # slått på for repoet. Det gjøres én gang under
+      # Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
       - name: Sett opp Pages
         uses: actions/configure-pages@v5
-        with:
-          # Slår på Pages for repoet første gang, så det ikke må gjøres manuelt.
-          enablement: true
 
       - name: Pakk nettstedet
         uses: actions/upload-pages-artifact@v3
