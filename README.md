@@ -72,8 +72,16 @@ python3 -m http.server 8080
 
 ## Publisere
 
-Legg innholdet på hvilken som helst statisk hosting. For GitHub Pages holder
-det å peke Pages mot branchen – `.nojekyll` er allerede på plass.
+`.github/workflows/pages.yml` publiserer appen til GitHub Pages ved hvert push
+til standardbranchen. Siden appen er ren statisk HTML, CSS og JavaScript,
+lastes repoet opp som det er – ingen bygging.
+
+Workflowen slår på Pages selv første gang den kjører (`configure-pages` med
+`enablement: true`). Skulle det feile, kan det gjøres manuelt under
+**Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+Appen kan også legges på hvilken som helst annen statisk hosting – den trenger
+bare å serveres over HTTP.
 
 ## Om fargene
 
