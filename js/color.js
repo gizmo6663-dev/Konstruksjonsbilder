@@ -67,6 +67,16 @@ export function contrastTextColor(hex) {
 }
 
 /**
+ * Hvor tungt forskjell i lyshet teller mot forskjell i fargetone.
+ *
+ * Med lik vekt vinner lysheten for lett: har paletten ingen lys lilla, havner
+ * en lys lilla nærmere grå enn den eneste mørke lilla-en, og motivet mister
+ * fargen. Halv vekt lar fargetonen avgjøre, og det treffer også rene gråtoner
+ * bedre – de gikk før til mørkegrønn og lyseblå.
+ */
+const LIGHTNESS_WEIGHT = 0.5;
+
+/**
  * Bygger et oppslagsverk for rask fargematching.
  * @param {Array<{hex:string}>} colors
  */
@@ -101,7 +111,7 @@ export function buildMatcher(colors) {
         const dL = lab.L - L[i];
         const da = lab.a - A[i];
         const db = lab.b - B[i];
-        const d = dL * dL + da * da + db * db;
+        const d = LIGHTNESS_WEIGHT * dL * dL + da * da + db * db;
         if (d < bestD) { bestD = d; best = i; }
       }
       return best;

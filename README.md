@@ -22,7 +22,10 @@ Alt skjer lokalt i nettleseren. Bildene lastes aldri opp noe sted.
   bredden tilsvarende, og hele motivet holder seg innenfor ett brett.
   Størrelsesvalget er et tak motivet legges inn i, ikke en fast bredde.
   Appen viser hvor stort det ferdige bildet blir i centimeter.
-- **Juster** – lysstyrke, kontrast, metning, dithering og bakgrunnsfjerning.
+- **Juster** – lysstyrke, kontrast, metning, dithering, kantstyrke og
+  bakgrunnsfjerning. Kantstyrke trekker fram tynne konturer: en svart strek som
+  dekker en tredjedel av ruta flytter gjennomsnittet bare en tredjedel av veien
+  mot svart, og forsvinner når fargen rundes av til nærmeste brikke.
   Du kan også begrense antallet farger, eller skru av fargene du ikke har.
 - **Få ut malen**:
   - **Skriv ut / lagre som PDF** – A4-sider med rutenett, symbol i hver rute,
@@ -47,7 +50,10 @@ Konverteringen gjøres i noen klart adskilte steg:
    nedskalerte rutene.
 3. **Fargematching** (`js/color.js`) – hver rute sammenlignes med paletten i
    **OKLab**, et fargerom der avstand tilsvarer hvor ulike fargene ser ut for øyet.
-   Det gir langt bedre treff enn å måle avstand i RGB.
+   Forskjell i lyshet teller halvt mot forskjell i fargetone: med lik vekt vinner
+   lysheten for lett, og en lys lilla havner nærmere grå enn den eneste mørke
+   lilla-en i paletten. Halv vekt treffer også rene gråtoner bedre – de gikk før
+   til mørkegrønn og lyseblå.
 4. **Dithering** (`js/quantize.js`) – valgfri feilspredning (Floyd–Steinberg
    eller Atkinson) i serpentinrekkefølge, slik at toneoverganger ikke blir flate.
 5. **Rutenettgeometri** (`js/pattern.js`, `js/render.js`) – rutenettet er et

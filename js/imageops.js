@@ -89,10 +89,12 @@ export function computeSourceRect(srcW, srcH, targetAspect, fit, posX = 0.5, pos
  * `rowShift` forskyver hver rad sidelengs, som andel av rutebredden, slik at
  * prøvepunktene treffer der brikkene faktisk havner. `boxes` lar en brikke
  * hente farge fra sitt eget fotavtrykk i stedet for hele ruta.
+ * `edgeStrength` trekker fram tynne konturer som ellers drukner i snittet.
  *
  * Returnerer sRGB-float i [0,1] pluss alfa per rute.
  */
-export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = gridW, boxes = null) {
+export function sampleToGrid(raster, rect, gridW, gridH, opts = {}) {
+  const { rowShift = 0, spanX = gridW, boxes = null, edgeStrength = 0 } = opts;
   const { width: sw, height: sh, linear } = raster;
   const out = new Float32Array(gridW * gridH * 4);
   const cellW = rect.w / spanX;
@@ -105,6 +107,9 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
     : [{ x: 0, y: 0, w: cellW, h: cellH }];
   const areaSum = areas.reduce((t, a) => t + a.w * a.h, 0);
 
+  // Gjenbrukes per rute for å slippe å regne ut de samme rektanglene to ganger.
+  const spans = [];
+
   for (let gy = 0; gy < gridH; gy++) {
     const shift = rowShift ? ((gy * rowShift) % 1) * cellW : 0;
     const originY = rect.y + gy * cellH;
@@ -112,7 +117,7 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
     for (let gx = 0; gx < gridW; gx++) {
       const originX = rect.x + gx * cellW + shift;
 
-      let r = 0, g = 0, b = 0, a = 0, wsum = 0;
+      spans.length = 0;
       for (const area of areas) {
         const fx0 = originX + area.x;
         const fy0 = originY + area.y;
@@ -122,8 +127,11 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
         const x1 = Math.min(sw, Math.ceil(fx1));
         const y0 = Math.max(0, Math.floor(fy0));
         const y1 = Math.min(sh, Math.ceil(fy1));
-        if (x1 <= x0 || y1 <= y0) continue;
+        if (x1 > x0 && y1 > y0) spans.push([fx0, fy0, fx1, fy1, x0, y0, x1, y1]);
+      }
 
+      let r = 0, g = 0, b = 0, a = 0, wsum = 0;
+      for (const [fx0, fy0, fx1, fy1, x0, y0, x1, y1] of spans) {
         for (let y = y0; y < y1; y++) {
           // Delvis dekning langs kanten teller mindre.
           const wy = Math.min(y + 1, fy1) - Math.max(y, fy0);
@@ -144,20 +152,87 @@ export function sampleToGrid(raster, rect, gridW, gridH, rowShift = 0, spanX = g
       }
 
       const o = (gy * gridW + gx) * 4;
-      if (wsum > 0) {
-        // Utsnitt som stikker utenfor bildet regnes som tomt, ikke som svart.
-        const coverage = wsum / areaSum;
-        const alpha = (a / wsum) * Math.min(1, coverage);
-        if (a > 1e-6) {
-          out[o] = linearToSrgb(r / a);
-          out[o + 1] = linearToSrgb(g / a);
-          out[o + 2] = linearToSrgb(b / a);
+      if (wsum <= 0) continue;
+
+      let cr = r / Math.max(a, 1e-6);
+      let cg = g / Math.max(a, 1e-6);
+      let cb = b / Math.max(a, 1e-6);
+
+      if (edgeStrength > 0 && a > 1e-6) {
+        const mix = minorityColor(linear, sw, spans, wsum, lum(cr, cg, cb));
+        if (mix) {
+          const k = edgeStrength * Math.min(1, mix.frac / MINORITY_FULL);
+          cr += (mix.r - cr) * k;
+          cg += (mix.g - cg) * k;
+          cb += (mix.b - cb) * k;
         }
-        out[o + 3] = alpha;
       }
+
+      if (a > 1e-6) {
+        out[o] = linearToSrgb(cr);
+        out[o + 1] = linearToSrgb(cg);
+        out[o + 2] = linearToSrgb(cb);
+      }
+      // Utsnitt som stikker utenfor bildet regnes som tomt, ikke som svart.
+      out[o + 3] = (a / wsum) * Math.min(1, wsum / areaSum);
     }
   }
   return out;
+}
+
+const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+// En rute der minst denne andelen skiller seg ut, trekkes helt over på
+// minoritetsfargen ved full kantstyrke.
+const MINORITY_FULL = 0.35;
+
+/**
+ * Finner en tydelig minoritet i ruta – typisk en svart kontur som ellers
+ * drukner i gjennomsnittet når bildet krympes.
+ *
+ * En strek som dekker en tredjedel av ruta flytter gjennomsnittet bare en
+ * tredjedel av veien mot svart, og blir borte når fargen skal rundes av til
+ * nærmeste brikke. Her regnes både de mørke og de lyse pikslene ut for seg,
+ * og den gruppa som skiller seg mest ut returneres.
+ */
+function minorityColor(linear, sw, spans, wsum, meanLum) {
+  const dark = { r: 0, g: 0, b: 0, w: 0 };
+  const light = { r: 0, g: 0, b: 0, w: 0 };
+  const darkLimit = meanLum * 0.5;
+  const lightLimit = meanLum + (1 - meanLum) * 0.5;
+
+  for (const [fx0, fy0, fx1, fy1, x0, y0, x1, y1] of spans) {
+    for (let y = y0; y < y1; y++) {
+      const wy = Math.min(y + 1, fy1) - Math.max(y, fy0);
+      if (wy <= 0) continue;
+      const row = y * sw;
+      for (let x = x0; x < x1; x++) {
+        const wx = Math.min(x + 1, fx1) - Math.max(x, fx0);
+        if (wx <= 0) continue;
+        const i = (row + x) * 4;
+        const al = linear[i + 3];
+        if (al < 0.5) continue;
+        const pr = linear[i] / al, pg = linear[i + 1] / al, pb = linear[i + 2] / al;
+        const l = lum(pr, pg, pb);
+        const bucket = l < darkLimit ? dark : l > lightLimit ? light : null;
+        if (!bucket) continue;
+        const wgt = wx * wy;
+        bucket.r += pr * wgt;
+        bucket.g += pg * wgt;
+        bucket.b += pb * wgt;
+        bucket.w += wgt;
+      }
+    }
+  }
+
+  const pick = dark.w >= light.w ? dark : light;
+  if (pick.w <= 0) return null;
+  return {
+    r: pick.r / pick.w,
+    g: pick.g / pick.w,
+    b: pick.b / pick.w,
+    frac: pick.w / wsum,
+  };
 }
 
 /** Lysstyrke, kontrast og metning på ferdig nedskalerte ruter (sRGB-float, in-place). */

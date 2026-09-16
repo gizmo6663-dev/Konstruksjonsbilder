@@ -90,7 +90,7 @@ export function buildPattern(raster, settings) {
   const {
     gridW, gridH, grid, rowShift, cellAspect, colors, unitCols, pieceUnits, pieceCells,
     fit, posX, posY,
-    brightness, contrast, saturation,
+    brightness, contrast, saturation, edgeStrength,
     dither, ditherAmount, backgroundTolerance,
   } = settings;
 
@@ -104,7 +104,9 @@ export function buildPattern(raster, settings) {
   // brikke et gjennomsnitt av en lang, tynn stripe av bildet. Vi prøvetar
   // derfor brikkas eget fotavtrykk.
   const boxes = sampleBoxes({ unitCols, pieceCells });
-  const cells = sampleToGrid(raster, rect, gridW, gridH, rowShift || 0, spanX, boxes);
+  const cells = sampleToGrid(raster, rect, gridW, gridH, {
+    rowShift: rowShift || 0, spanX, boxes, edgeStrength,
+  });
 
   applyAdjustments(cells, { brightness, contrast, saturation });
   removeBackground(cells, gridW, gridH, backgroundTolerance);

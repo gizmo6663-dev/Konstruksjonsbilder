@@ -33,6 +33,8 @@ const state = {
   brightness: 0,
   contrast: 0,
   saturation: 0,
+  // Trekker fram tynne konturer som drukner i snittet når bildet krympes.
+  edgeStrength: 60,
   dither: 'none',
   bgTolerance: 0,
   pitch: { ...START.pitch },
@@ -158,6 +160,7 @@ function recompute() {
     brightness: state.brightness / 100,
     contrast: 1 + state.contrast / 100,
     saturation: 1 + state.saturation / 100,
+    edgeStrength: state.edgeStrength / 100,
     dither: state.dither,
     ditherAmount: 1,
     backgroundTolerance: state.bgTolerance / 100,
@@ -614,18 +617,26 @@ function wireEvents() {
   slider('#brightness', '#out-brightness', (v) => { state.brightness = v; return signed(v); });
   slider('#contrast', '#out-contrast', (v) => { state.contrast = v; return signed(v); });
   slider('#saturation', '#out-saturation', (v) => { state.saturation = v; return signed(v); });
+  slider('#edge-strength', '#out-edge', (v) => {
+    state.edgeStrength = v;
+    return v === 0 ? 'av' : v + ' %';
+  });
   slider('#bg-tolerance', '#out-bg', (v) => {
     state.bgTolerance = v;
     return v === 0 ? 'av' : String(v);
   });
 
   $('#btn-reset-adjust').addEventListener('click', () => {
-    Object.assign(state, { brightness: 0, contrast: 0, saturation: 0, bgTolerance: 0, maxColors: 0 });
+    Object.assign(state, {
+      brightness: 0, contrast: 0, saturation: 0, bgTolerance: 0, maxColors: 0, edgeStrength: 60,
+    });
     for (const [id, out] of [['#brightness', '#out-brightness'], ['#contrast', '#out-contrast'],
       ['#saturation', '#out-saturation'], ['#bg-tolerance', '#out-bg']]) {
       $(id).value = 0;
       $(out).textContent = id === '#bg-tolerance' ? 'av' : '0';
     }
+    $('#edge-strength').value = state.edgeStrength;
+    $('#out-edge').textContent = state.edgeStrength + ' %';
     updateLimitLabel();
     scheduleRecompute();
   });
@@ -1002,6 +1013,8 @@ function applySettingsToUI() {
   $('#contrast').value = state.contrast;
   $('#saturation').value = state.saturation;
   $('#bg-tolerance').value = state.bgTolerance;
+  $('#edge-strength').value = state.edgeStrength;
+  $('#out-edge').textContent = state.edgeStrength === 0 ? 'av' : state.edgeStrength + ' %';
   $('#pos-x').value = state.posX * 100;
   $('#pos-y').value = state.posY * 100;
   $('#out-brightness').textContent = signed(state.brightness);

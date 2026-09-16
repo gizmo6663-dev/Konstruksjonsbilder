@@ -132,6 +132,12 @@
           <input type="range" id="saturation" min="-100" max="100" value="0">
         </label>
         <label class="field field--slider">
+          <span>Kantstyrke <output id="out-edge">60 %</output></span>
+          <input type="range" id="edge-strength" min="0" max="100" value="60">
+        </label>
+        <p class="muted small">En svart kontur som bare dekker en tredjedel av ruta drukner i gjennomsnittet når bildet krympes. Kantstyrke trekker slike konturer fram igjen. Sett den til 0 for rent gjennomsnitt.</p>
+
+        <label class="field field--slider">
           <span>Fjern bakgrunn <output id="out-bg">av</output></span>
           <input type="range" id="bg-tolerance" min="0" max="60" value="0">
         </label>
