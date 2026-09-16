@@ -133,6 +133,40 @@ function drawCell(ctx, style, x, y, w, h, hex) {
       ctx.lineTo(x0 + a, y0 + c);
       ctx.closePath();
       ctx.fill();
+      // Tynt omriss gjør at hver enkelt brikke skiller seg fra naboene,
+      // også der to like farger ligger inntil hverandre.
+      const stroke = Math.min(w, ph) * 0.06;
+      if (stroke > 0.35) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,.72)';
+        ctx.lineWidth = stroke;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.restore();
+      }
+      break;
+    }
+    case 'brick': {
+      // Sett forfra: flat klossforside med skjøt mot raden under.
+      ctx.fillRect(x, y, w + 0.3, h + 0.3);
+      const seam = Math.max(0.6, h * 0.1);
+      if (h > 3) {
+        ctx.save();
+        ctx.globalAlpha *= 0.3;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, y + h - seam, w + 0.3, seam);
+        ctx.globalAlpha *= 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x, y, w + 0.3, Math.max(0.5, h * 0.07));
+        ctx.restore();
+      }
+      if (w > 4) {
+        ctx.save();
+        ctx.globalAlpha *= 0.18;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x + w - Math.max(0.5, w * 0.05), y, Math.max(0.5, w * 0.05), h);
+        ctx.restore();
+      }
       break;
     }
     default:

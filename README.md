@@ -9,8 +9,12 @@ Alt skjer lokalt i nettleseren. Bildene lastes aldri opp noe sted.
 ## Hva den gjør
 
 - **Last opp et bilde** – velg fil, dra og slipp, eller lim inn fra utklippstavla.
-- **Velg materiale** – strykeperler (Hama/Perler midi), LEGO 1×1 plater,
-  Plus-Plus, eller en egendefinert palett du fyller inn selv.
+- **Velg materiale** – strykeperler (Hama/Perler midi), LEGO, Plus-Plus, eller
+  en egendefinert palett du fyller inn selv.
+- **Velg byggemåte** (LEGO) – liggende eller oppreist. Det avgjør formen på
+  hver piksel: en plate sett ovenfra er 8 × 8 mm, mens forsiden av en kloss i
+  en vegg er 8 × 9,6 mm. Uten det valget blir et oppreist motiv strukket 20 %
+  på høyden.
 - **Velg størrelse** – ferdige mål som ett perlebrett (29 × 29) eller en
   LEGO-byggeplate (32 × 32), eller sett bredde og høyde selv. Appen viser
   hvor stort det ferdige bildet blir i centimeter.
@@ -20,6 +24,10 @@ Alt skjer lokalt i nettleseren. Bildene lastes aldri opp noe sted.
   - **Skriv ut / lagre som PDF** – A4-sider med rutenett, symbol i hver rute,
     rad- og kolonnenummer, minikart over hvor på motivet siden hører hjemme,
     og en oversiktsside med fargeliste og antall brikker per farge.
+    **Naturlig størrelse** skriver malen ut 1:1, slik at perlebrettet kan
+    legges rett oppå arket og perlene settes i pinnene. Hver side har en
+    50 mm kontrollinjal så du kan måle at utskriften ikke er skalert – slå av
+    «Tilpass til side» i utskriftsdialogen.
   - **Last ned PNG** – enten et stort mønsterbilde eller ett bildepunkt per brikke.
   - **Fargeliste som tekstfil** – handleliste med antall.
   - **Byggemodus** – gå gjennom mønsteret rad for rad på skjerm, med
@@ -39,8 +47,13 @@ Konverteringen gjøres i noen klart adskilte steg:
 4. **Dithering** (`js/quantize.js`) – valgfri feilspredning (Floyd–Steinberg
    eller Atkinson) i serpentinrekkefølge, slik at toneoverganger ikke blir flate.
 5. **Rutenettgeometri** (`js/pattern.js`, `js/render.js`) – kvadratisk rutenett
-   for perler og LEGO, forskjøvet rutenett for Plus-Plus der annenhver rad
-   forskyves en halv brikke og radene ligger en halv brikkehøyde fra hverandre.
+   for perler og liggende LEGO, forskjøvet rutenett for Plus-Plus der annenhver
+   rad forskyves en halv brikke og radene ligger en halv brikkehøyde fra
+   hverandre, og rektangulære ruter for oppreist LEGO.
+
+Brikkeformen har bare én kilde: brikkemålene i millimeter (`pitch`). Forholdet
+mellom bredde og høyde bestemmer formen på pikslene, og de samme tallene gir
+ferdigmålet og 1:1-utskriften. Da kan de ikke komme i utakt med hverandre.
 
 ### Filer
 

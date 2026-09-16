@@ -15,6 +15,8 @@ export class BuildMode {
     this.zoom = 1;
     this.key = '';
     this.style = 'flat';
+    // En vegg bygges nedenfra og opp; en flat mosaikk legges ovenfra og ned.
+    this.bottomUp = false;
     this._bindDom();
   }
 
@@ -43,11 +45,12 @@ export class BuildMode {
             </div>
             <ol class="bm__runs"></ol>
             <div class="bm__actions">
+              <button class="btn btn--ghost btn--sm" data-act="direction"></button>
               <button class="btn btn--primary" data-act="row-done">Rad ferdig – neste</button>
               <button class="btn btn--ghost" data-act="row-undo">Angre raden</button>
               <button class="btn btn--ghost btn--danger" data-act="reset">Nullstill alt</button>
             </div>
-            <p class="bm__hint">Klikk på en rute for å hake den av. Piltastene ↑ ↓ bytter rad, mellomrom merker raden ferdig.</p>
+            <p class="bm__hint">Klikk på en rute for å hake den av. Piltastene ↑ ↓ bytter rad, mellomrom merker raden ferdig og går videre i byggeretningen.</p>
           </aside>
         </div>
       </div>`;
@@ -72,6 +75,7 @@ export class BuildMode {
         'zoom-in': () => this.setZoom(this.zoom * 1.3),
         'zoom-out': () => this.setZoom(this.zoom / 1.3),
         'zoom-fit': () => this.fitZoom(),
+        direction: () => { this.bottomUp = !this.bottomUp; this.render(); },
       };
       actions[act]?.();
     });
@@ -98,6 +102,7 @@ export class BuildMode {
       this.done = this._load();
       this.row = this._firstUnfinishedRow();
     }
+    this.bottomUp = !!opts.buildFromBottom;
     this.root.hidden = false;
     document.body.classList.add('is-building');
     requestAnimationFrame(() => this.fitZoom());
@@ -125,15 +130,17 @@ export class BuildMode {
     }
   }
 
+  /** Første rad som mangler brikker, sett i den rekkefølgen man bygger. */
   _firstUnfinishedRow() {
     const p = this.pattern;
-    for (let y = 0; y < p.gridH; y++) {
+    for (let n = 0; n < p.gridH; n++) {
+      const y = this.bottomUp ? p.gridH - 1 - n : n;
       for (let x = 0; x < p.gridW; x++) {
         const i = cellIndex(p, x, y);
         if (p.indices[i] >= 0 && !this.done.has(i)) return y;
       }
     }
-    return 0;
+    return this.bottomUp ? p.gridH - 1 : 0;
   }
 
   setRow(y) {
@@ -151,7 +158,10 @@ export class BuildMode {
       done ? this.done.add(i) : this.done.delete(i);
     }
     this._save();
-    if (advance && this.row < p.gridH - 1) this.row++;
+    if (advance) {
+      const next = this.row + (this.bottomUp ? -1 : 1);
+      if (next >= 0 && next < p.gridH) this.row = next;
+    }
     this.render();
     this._scrollRowIntoView();
   }
@@ -159,7 +169,7 @@ export class BuildMode {
   reset() {
     if (!confirm('Nullstille all fremdrift for dette mønsteret?')) return;
     this.done.clear();
-    this.row = 0;
+    this.row = this.bottomUp ? this.pattern.gridH - 1 : 0;
     this._save();
     this.render();
   }
@@ -235,6 +245,9 @@ export class BuildMode {
 
     this._renderRuns();
     this._renderProgress();
+    this.root.querySelector('[data-act="direction"]').textContent = this.bottomUp
+      ? 'Bygger nedenfra og opp ↑'
+      : 'Bygger ovenfra og ned ↓';
   }
 
   _renderProgress() {

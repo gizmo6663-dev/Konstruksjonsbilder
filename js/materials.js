@@ -1,8 +1,16 @@
 // Materialdefinisjoner: hvordan rutenettet ser ut, hvilken palett som brukes,
 // og hvilke størrelser som er praktiske å bygge.
 //
-// `pitch` er omtrentlig fysisk størrelse per brikke og brukes bare til å vise
-// hvor stort det ferdige bildet blir. Verdiene kan overstyres i appen.
+// `pitch` er omtrentlig fysisk størrelse per brikke i millimeter, og er eneste
+// kilde til brikkeform: forholdet w/h avgjør om pikslene er kvadratiske eller
+// ikke. Verdiene kan overstyres i appen, og styrer også ferdigmålet som vises.
+//
+// `fixedShape` betyr at materialet har en gitt form – endrer man bredden,
+// følger høyden etter i samme forhold.
+//
+// Et materiale kan ha `variants`: ulike måter å bygge det samme materialet på.
+// LEGO har det, fordi en plate sett ovenfra er kvadratisk (8 × 8 mm), mens
+// forsiden av en kloss i en vegg er høyere enn den er bred (8 × 9,6 mm).
 
 export const MATERIALS = [
   {
@@ -13,21 +21,22 @@ export const MATERIALS = [
     description: 'Hama / Perler / Nabbi midi-perler på perlebrett.',
     palette: 'hama-midi',
     grid: 'square',
-    cellAspect: 1,
-    lockAspect: true,
+    fixedShape: true,
     style: 'bead',
     unit: 'perle',
     unitPlural: 'perler',
     pitch: { w: 5, h: 5 },
     presets: [
-      { name: '1 brett – 29 × 29', w: 29, h: 29 },
-      { name: '2 brett bredt – 58 × 29', w: 58, h: 29 },
-      { name: '4 brett – 58 × 58', w: 58, h: 58 },
-      { name: '9 brett – 87 × 87', w: 87, h: 87 },
-      { name: 'Lite motiv – 20 × 20', w: 20, h: 20 },
+      { name: '25 × 25 pinner', w: 25, h: 25 },
+      { name: '29 × 29 pinner', w: 29, h: 29 },
+      { name: '20 × 20 pinner', w: 20, h: 20 },
+      { name: '14 × 14 pinner (lite brett)', w: 14, h: 14 },
+      { name: '50 × 50 – flere brett', w: 50, h: 50 },
+      { name: '58 × 58 – flere brett', w: 58, h: 58 },
     ],
     tips: [
-      'Et vanlig kvadratisk perlebrett er 29 × 29 pinner. Større motiv bygges ved å legge flere brett inntil hverandre.',
+      'Tell pinnene på ditt eget brett og skriv inn tallet – kvadratiske brett varierer mellom merkene, typisk mellom 14 og 29 pinner. Er malen bredere enn brettet, må motivet bygges over flere brett.',
+      'Vil du legge brettet rett oppå utskriften? Velg «Naturlig størrelse» under Skriv ut, og slå av «Tilpass til side» i utskriftsdialogen. Mål kontrollinjalen nederst på arket for å sjekke at skalaen stemmer.',
       'Legg bakepapir over før du stryker, og stryk begge sider hvis motivet skal tåle håndtering.',
       'Motiv med tomme ruter kan falle fra hverandre – sørg for at alle perler henger sammen.',
     ],
@@ -37,26 +46,81 @@ export const MATERIALS = [
     name: 'LEGO',
     short: 'LEGO',
     icon: 'stud',
-    description: '1 × 1 plater på byggeplate – klassisk klossmosaikk.',
+    description: 'Klossmosaikk. Velg om bildet skal bygges flatt eller stå opp.',
     palette: 'lego',
     grid: 'square',
-    cellAspect: 1,
-    lockAspect: true,
-    style: 'stud',
-    unit: 'plate',
-    unitPlural: 'plater',
-    pitch: { w: 8, h: 8 },
-    presets: [
-      { name: 'Byggeplate – 32 × 32', w: 32, h: 32 },
-      { name: 'Stor plate – 48 × 48', w: 48, h: 48 },
-      { name: 'Liten plate – 16 × 16', w: 16, h: 16 },
-      { name: '4 plater – 64 × 64', w: 64, h: 64 },
-      { name: 'Portrett – 48 × 64', w: 48, h: 64 },
-    ],
-    tips: [
-      'Bruk 1 × 1 plater (del 3024). Ligger flere like farger på rad kan de erstattes med 1 × 2, 1 × 3 eller 1 × 4 plater – det holder bedre sammen og blir billigere.',
-      'En standard byggeplate er 32 × 32 knotter. Skal du ha flere plater ved siden av hverandre, bind dem sammen på baksiden.',
-      'Henger bildet på veggen? Bygg et lag plater i bunn før mosaikken, så sitter brikkene bedre.',
+    fixedShape: true,
+    variants: [
+      {
+        id: 'liggende',
+        short: 'liggende',
+        name: 'Liggende – plater flatt på byggeplate',
+        // Sett ovenfra er knottavstanden lik i begge retninger.
+        hint: 'Bildet ses ovenfra. Hver rute er én 1 × 1 plate, 8 × 8 mm, så pikslene blir kvadratiske.',
+        style: 'stud',
+        unit: 'plate',
+        unitPlural: 'plater',
+        pitch: { w: 8, h: 8 },
+        presets: [
+          { name: 'Byggeplate – 32 × 32', w: 32, h: 32 },
+          { name: 'Stor plate – 48 × 48', w: 48, h: 48 },
+          { name: 'Liten plate – 16 × 16', w: 16, h: 16 },
+          { name: '4 plater – 64 × 64', w: 64, h: 64 },
+          { name: 'Portrett – 48 × 64', w: 48, h: 64 },
+        ],
+        tips: [
+          'Bruk 1 × 1 plater (del 3024). Ligger flere like farger på rad, kan de erstattes med 1 × 2, 1 × 3 eller 1 × 4 plater – det holder bedre sammen og blir billigere.',
+          'En standard byggeplate er 32 × 32 knotter. Skal du ha flere plater ved siden av hverandre, bind dem sammen på baksiden.',
+          'Henger bildet på veggen? Bygg et lag plater i bunn før mosaikken, så sitter brikkene bedre.',
+        ],
+      },
+      {
+        id: 'staaende-kloss',
+        short: 'oppreist med klosser',
+        name: 'Oppreist – klosser stablet i høyden',
+        // En kloss er 9,6 mm høy og 8 mm bred. Uten denne forskjellen blir
+        // motivet strukket 20 % på høyden.
+        hint: 'Bildet ses forfra, som en vegg. Hver rute er forsiden av én 1 × 1 kloss, 8 × 9,6 mm – høyere enn den er bred, så malen får færre rader enn kolonner.',
+        style: 'brick',
+        buildFromBottom: true,
+        unit: 'kloss',
+        unitPlural: 'klosser',
+        pitch: { w: 8, h: 9.6 },
+        presets: [
+          { name: 'Vegg – 32 klosser bred', w: 32, h: 27 },
+          { name: 'Liten vegg – 16 bred', w: 16, h: 13 },
+          { name: 'Mellom – 24 bred', w: 24, h: 20 },
+          { name: 'Stor vegg – 48 bred', w: 48, h: 40 },
+        ],
+        tips: [
+          'Bygg rad for rad nedenfra. Slå sammen like farger ved siden av hverandre til 1 × 2, 1 × 3 og 1 × 4 klosser – da griper radene i hverandre og veggen henger sammen. En vegg av bare 1 × 1 klosser står ikke støtt.',
+          'Forskyv skjøtene mellom radene der du kan, akkurat som i en murvegg. Byggemodus viser hvor de lange fargestrekkene er.',
+          'Start på en byggeplate eller en rad lange plater, og legg gjerne et lag plater øverst som avslutning.',
+          'Trenger du finere detaljer i høyden, bytt til «Oppreist – plater»: en plate er en tredjedel så høy som en kloss.',
+        ],
+      },
+      {
+        id: 'staaende-plate',
+        short: 'oppreist med plater',
+        name: 'Oppreist – plater stablet i høyden',
+        hint: 'Som over, men bygget av 1 × 1 plater: 8 × 3,2 mm per rute. Tre ganger så fin oppløsning loddrett – og tre ganger så mange rader.',
+        style: 'brick',
+        buildFromBottom: true,
+        unit: 'plate',
+        unitPlural: 'plater',
+        pitch: { w: 8, h: 3.2 },
+        presets: [
+          { name: 'Vegg – 24 plater bred', w: 24, h: 60 },
+          { name: 'Liten – 16 bred', w: 16, h: 40 },
+          { name: 'Stor – 32 bred', w: 32, h: 80 },
+          { name: 'Ekstra stor – 48 bred', w: 48, h: 120 },
+        ],
+        tips: [
+          'Tre plater i høyden tilsvarer én kloss. Malen blir høy: regn med rundt 2,5 ganger så mange rader som kolonner for et kvadratisk motiv.',
+          'Slå sammen like farger på rad til lange plater, og forskyv skjøtene mellom radene – ellers deler veggen seg i loddrette søyler.',
+          'En vegg av bare plater er skjør. Legg inn et lag klosser med jevne mellomrom, eller bygg mot en bakplate.',
+        ],
+      },
     ],
   },
   {
@@ -69,8 +133,8 @@ export const MATERIALS = [
     grid: 'offset',
     // Radene ligger en halv brikkehøyde fra hverandre og forskyves annenhver
     // gang en halv brikke sidelengs – det er slik brikkene låser i hverandre.
-    cellAspect: 2,
-    lockAspect: false,
+    // Derfor er høyden per rad halvparten av bredden per brikke.
+    fixedShape: false,
     style: 'plus',
     unit: 'brikke',
     unitPlural: 'brikker',
@@ -95,8 +159,7 @@ export const MATERIALS = [
     description: 'Egne farger og egen rutestørrelse – mosaikk, broderi, strikk, hva som helst.',
     palette: 'generisk',
     grid: 'square',
-    cellAspect: 1,
-    lockAspect: false,
+    fixedShape: false,
     style: 'flat',
     unit: 'rute',
     unitPlural: 'ruter',
@@ -117,4 +180,28 @@ export const MATERIALS = [
 
 export function getMaterial(id) {
   return MATERIALS.find((m) => m.id === id) || MATERIALS[0];
+}
+
+/**
+ * Slår sammen et materiale med den valgte byggemåten, og utleder brikkeformen
+ * fra brikkemålene. `pitchOverride` lar brukerens egne mm-verdier gjelde.
+ */
+export function resolveMaterial(id, variantId, pitchOverride) {
+  const base = getMaterial(id);
+  const variant = base.variants
+    ? base.variants.find((v) => v.id === variantId) || base.variants[0]
+    : null;
+
+  const merged = { ...base, ...(variant || {}) };
+  merged.id = base.id;
+  merged.name = base.name;
+  merged.short = base.short;
+  merged.variantShort = variant ? variant.short : null;
+  merged.variants = base.variants || null;
+  merged.variantId = variant ? variant.id : null;
+  merged.variantName = variant ? variant.name : null;
+  merged.hint = variant ? variant.hint : base.hint || '';
+  if (pitchOverride) merged.pitch = pitchOverride;
+  merged.cellAspect = merged.pitch.w / merged.pitch.h;
+  return merged;
 }

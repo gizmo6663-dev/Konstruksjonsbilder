@@ -1,22 +1,26 @@
 // Applikasjonen: kobler sammen innstillinger, bildebehandling og visning.
 
-import { MATERIALS, getMaterial } from './materials.js';
+import { MATERIALS, getMaterial, resolveMaterial } from './materials.js';
 import { PALETTES, flattenPalette, defaultEnabledGroups } from './palettes.js';
 import { decodeImage, rasterize } from './imageops.js';
 import { DITHER_MODES, countColors } from './quantize.js';
 import { buildPattern } from './pattern.js';
 import { drawPattern, renderToCanvas, renderRawCanvas, patternPixelSize } from './render.js';
-import { buildPrintSheets, estimateSheets, CELL_SIZE_OPTIONS } from './printsheet.js';
+import { buildPrintSheets, estimateSheets, cellSizeOptions } from './printsheet.js';
 import { BuildMode } from './buildmode.js';
 import { contrastTextColor } from './color.js';
 
 const SETTINGS_KEY = 'konstruksjonsbilder:innstillinger:v1';
 const $ = (sel) => document.querySelector(sel);
 
+// Startverdiene kommer fra materialet selv, så det er ett sted å endre dem.
+const START = resolveMaterial('perler');
+
 const state = {
-  materialId: 'perler',
-  gridW: 29,
-  gridH: 29,
+  materialId: START.id,
+  variants: {},
+  gridW: START.presets[0].w,
+  gridH: START.presets[0].h,
   lockRatio: true,
   fit: 'cover',
   posX: 0.5,
@@ -26,8 +30,7 @@ const state = {
   saturation: 0,
   dither: 'none',
   bgTolerance: 0,
-  cellAspect: 1,
-  pitch: { w: 5, h: 5 },
+  pitch: { ...START.pitch },
   maxColors: 0,
   enabledGroups: {},
   offColors: new Set(),
@@ -35,7 +38,8 @@ const state = {
   view: 'pattern',
   showGrid: false,
   showSymbols: false,
-  print: { title: '', cellSize: 'auto', color: true, symbols: true, overlap: true },
+  // Naturlig størrelse er forvalget: da kan brettet legges rett oppå arket.
+  print: { title: '', cellSize: 'natural', color: true, symbols: true, overlap: true },
 };
 
 let raster = null;
@@ -48,6 +52,15 @@ const buildMode = new BuildMode($('#build-root'));
 buildMode.onClose = () => buildMode.close();
 
 /* ── Palett ─────────────────────────────────────────────────────────── */
+
+/** Materialet slik det faktisk er satt opp nå: byggemåte + brukerens brikkemål. */
+function currentMaterial() {
+  return resolveMaterial(state.materialId, state.variants[state.materialId], state.pitch);
+}
+
+function cellAspect() {
+  return state.pitch.w / state.pitch.h;
+}
 
 function currentPaletteId() {
   return getMaterial(state.materialId).palette;
@@ -85,7 +98,7 @@ function scheduleRecompute() {
 
 function recompute() {
   if (!raster) return;
-  const mat = getMaterial(state.materialId);
+  const mat = currentMaterial();
   let colors = activeColors();
   if (colors.length === 0) {
     toast('Velg minst én farge.');
@@ -96,7 +109,7 @@ function recompute() {
     gridW: state.gridW,
     gridH: state.gridH,
     grid: mat.grid,
-    cellAspect: state.cellAspect,
+    cellAspect: cellAspect(),
     fit: state.fit,
     posX: state.posX,
     posY: state.posY,
@@ -127,7 +140,7 @@ function recompute() {
 
 function renderPreview() {
   if (!pattern) return;
-  const mat = getMaterial(state.materialId);
+  const mat = currentMaterial();
   const stage = $('#stage');
   const figPattern = $('#fig-pattern');
   const figOriginal = $('#fig-original');
@@ -196,7 +209,7 @@ function drawOriginal(budget) {
 }
 
 function renderStats() {
-  const mat = getMaterial(state.materialId);
+  const mat = currentMaterial();
   const cmW = (pattern.gridW * state.pitch.w) / 10;
   const cmH = (pattern.gridH * state.pitch.h) / 10;
   const parts = [
@@ -248,7 +261,7 @@ function buildMaterialCards() {
 
 function selectMaterial(id, resetSize) {
   state.materialId = id;
-  const mat = getMaterial(id);
+  const base = getMaterial(id);
 
   document.querySelectorAll('[data-material]').forEach((el) => {
     const on = el.dataset.material === id;
@@ -256,31 +269,54 @@ function selectMaterial(id, resetSize) {
     el.setAttribute('aria-checked', String(on));
   });
 
-  $('#material-desc').textContent = mat.description;
-  $('#tips-material').textContent = mat.name.toLowerCase();
-  $('#tips').innerHTML = mat.tips.map((t) => `<li>${esc(t)}</li>`).join('');
-  $('#palette-note').textContent = PALETTES[mat.palette].note;
-  $('#unit-w').textContent = mat.unitPlural;
-  $('#unit-h').textContent = mat.unitPlural;
+  $('#material-desc').textContent = base.description;
+  $('#palette-note').textContent = PALETTES[base.palette].note;
 
-  if (resetSize) {
-    state.pitch = { ...mat.pitch };
-    state.cellAspect = mat.cellAspect;
-    const preset = mat.presets[0];
-    state.gridW = preset.w;
-    state.gridH = preset.h;
-  }
-
-  $('#aspect-field').hidden = mat.lockAspect;
-  $('#aspect-note').textContent = mat.lockAspect
-    ? ''
-    : 'Mål en testflate på 4 × 4 brikker og juster til bildet ikke blir strukket.';
-
-  buildPresets(mat);
+  buildVariantUI(base);
+  if (resetSize) resetToMaterialDefaults();
+  refreshMaterialTexts();
+  buildPresets(currentMaterial());
   buildPaletteUI();
   syncSizeInputs();
   applyRatioLock();
   scheduleRecompute();
+}
+
+/** Byggemåte-velgeren vises bare for materialer som faktisk har flere. */
+function buildVariantUI(base) {
+  const field = $('#variant-field');
+  const sel = $('#variant');
+  if (!base.variants) {
+    field.hidden = true;
+    $('#variant-hint').textContent = '';
+    return;
+  }
+  field.hidden = false;
+  sel.innerHTML = base.variants.map((v) => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
+  sel.value = state.variants[base.id] || base.variants[0].id;
+  state.variants[base.id] = sel.value;
+}
+
+function resetToMaterialDefaults() {
+  const mat = resolveMaterial(state.materialId, state.variants[state.materialId]);
+  state.pitch = { ...mat.pitch };
+  const preset = mat.presets[0];
+  state.gridW = preset.w;
+  state.gridH = preset.h;
+}
+
+function refreshMaterialTexts() {
+  const mat = currentMaterial();
+  $('#variant-hint').textContent = mat.variantName ? mat.hint : '';
+  $('#tips-material').textContent = mat.variantShort
+    ? `${mat.short} ${mat.variantShort}`
+    : mat.name.toLowerCase();
+  $('#tips').innerHTML = mat.tips.map((t) => `<li>${esc(t)}</li>`).join('');
+  $('#unit-w').textContent = mat.unitPlural;
+  $('#unit-h').textContent = mat.unitPlural;
+  $('#pitch-note').textContent = mat.fixedShape
+    ? 'Forholdet mellom bredde og høyde er gitt av materialet – endrer du bredden, følger høyden etter.'
+    : 'Forholdet mellom bredde og høyde avgjør formen på hver rute. Mål en testflate på 4 × 4 brikker om du er usikker.';
 }
 
 function buildPresets(mat) {
@@ -336,10 +372,8 @@ function renderSwatches() {
 function syncSizeInputs() {
   $('#grid-w').value = state.gridW;
   $('#grid-h').value = state.gridH;
-  $('#pitch-w').value = state.pitch.w;
-  $('#pitch-h').value = state.pitch.h;
-  $('#cell-aspect').value = Math.round(state.cellAspect * 100);
-  $('#out-aspect').textContent = num(state.cellAspect, 2);
+  $('#pitch-w').value = round1(state.pitch.w);
+  $('#pitch-h').value = round1(state.pitch.h);
   $('#lock-ratio').checked = state.lockRatio;
   $('#fit').value = state.fit;
   $('#position-controls').hidden = state.fit !== 'cover';
@@ -349,7 +383,7 @@ function applyRatioLock() {
   const h = $('#grid-h');
   h.disabled = state.lockRatio && !!raster;
   if (state.lockRatio && raster) {
-    state.gridH = clamp(Math.round((state.gridW * state.cellAspect) / imageAspect), 4, 300);
+    state.gridH = clamp(Math.round((state.gridW * cellAspect()) / imageAspect), 4, 300);
     h.value = state.gridH;
   }
 }
@@ -382,10 +416,20 @@ function wireEvents() {
   $('#btn-example').addEventListener('click', loadExample);
 
   // Størrelse
+  $('#variant').addEventListener('change', (e) => {
+    state.variants[state.materialId] = e.target.value;
+    resetToMaterialDefaults();
+    refreshMaterialTexts();
+    buildPresets(currentMaterial());
+    syncSizeInputs();
+    applyRatioLock();
+    scheduleRecompute();
+  });
+
   $('#preset').addEventListener('change', (e) => {
     const i = e.target.value;
     if (i === '') return;
-    const p = getMaterial(state.materialId).presets[Number(i)];
+    const p = currentMaterial().presets[Number(i)];
     state.gridW = p.w;
     if (!state.lockRatio) state.gridH = p.h;
     syncSizeInputs();
@@ -419,23 +463,21 @@ function wireEvents() {
   slider('#pos-y', '#out-posy', (v) => { state.posY = v / 100; return posLabel(v); });
 
   $('#pitch-w').addEventListener('input', (e) => {
-    state.pitch.w = Math.max(0.5, parseFloat(e.target.value) || 1);
-    if (getMaterial(state.materialId).lockAspect) {
-      state.pitch.h = state.pitch.w;
+    const v = parseFloat(e.target.value);
+    if (!(v > 0)) return;
+    // Har materialet en gitt form, følger høyden bredden i samme forhold.
+    if (currentMaterial().fixedShape) {
+      state.pitch.h = round1(state.pitch.h * (v / state.pitch.w));
       $('#pitch-h').value = state.pitch.h;
     }
-    renderStats();
-    saveSettings();
+    state.pitch.w = v;
+    onPitchChanged();
   });
   $('#pitch-h').addEventListener('input', (e) => {
-    state.pitch.h = Math.max(0.5, parseFloat(e.target.value) || 1);
-    renderStats();
-    saveSettings();
-  });
-  slider('#cell-aspect', '#out-aspect', (v) => {
-    state.cellAspect = v / 100;
-    applyRatioLock();
-    return num(state.cellAspect, 2);
+    const v = parseFloat(e.target.value);
+    if (!(v > 0)) return;
+    state.pitch.h = v;
+    onPitchChanged();
   });
 
   // Justering
@@ -547,7 +589,8 @@ function wireEvents() {
   // Handlinger
   $('#btn-build').addEventListener('click', () => {
     if (!pattern) return;
-    buildMode.open(pattern, { style: getMaterial(state.materialId).style });
+    const mat = currentMaterial();
+    buildMode.open(pattern, { style: mat.style, buildFromBottom: !!mat.buildFromBottom });
   });
 
   const menu = $('#download-menu');
@@ -560,6 +603,13 @@ function wireEvents() {
 
   wirePrintDialog();
   window.addEventListener('resize', debounce(renderPreview, 150));
+}
+
+/** Brikkemålene styrer både ferdigmål og rutenettets form. */
+function onPitchChanged() {
+  applyRatioLock();
+  if (pattern) renderStats();
+  scheduleRecompute();
 }
 
 function slider(id, outId, handler) {
@@ -662,7 +712,7 @@ async function loadExample() {
 
 function download(kind) {
   if (!pattern) return;
-  const mat = getMaterial(state.materialId);
+  const mat = currentMaterial();
   const base = (state.print.title || imageName || 'byggemal').replace(/[^\w æøåÆØÅ-]+/g, '').trim() || 'byggemal';
 
   if (kind === 'list') {
@@ -706,22 +756,40 @@ function saveBlob(blob, filename) {
 function wirePrintDialog() {
   const dialog = $('#print-dialog');
   const cellSel = $('#print-cell');
-  cellSel.innerHTML = CELL_SIZE_OPTIONS.map((o) => `<option value="${o.mm ?? 'auto'}">${esc(o.name)}</option>`).join('');
 
   const refresh = () => {
     if (!pattern) return;
-    const opts = { cellSize: cellSel.value, overlap: $('#print-overlap').checked };
+    const opts = { cellSize: cellSel.value, overlap: $('#print-overlap').checked, pitch: state.pitch };
     const est = estimateSheets(pattern, opts);
-    $('#print-estimate').textContent =
-      `${est.pages} A4-sider: 1 oversikt + ${est.tilesX} × ${est.tilesY} rutenettsider (${num(est.cellMm)} mm per rute).`;
+    const trueScale = Math.abs(est.cellMm - state.pitch.w) < 0.05;
+    const tiles = est.tilesX * est.tilesY;
+    const sheets = tiles === 1
+      ? '1 oversiktsside + 1 rutenettside'
+      : `1 oversiktsside + ${tiles} rutenettsider (${est.tilesX} × ${est.tilesY})`;
+    const lines = [
+      `${est.pages} A4-sider: ${sheets}, `
+      + `${num(est.cellMm, 2)} × ${num(est.cellMm / pattern.cellAspect, 2)} mm per rute.`,
+    ];
+    if (trueScale) {
+      lines.push('Naturlig størrelse: brettet kan legges rett oppå arket. '
+        + 'Slå av «Tilpass til side» / velg 100 % skala i utskriftsdialogen, '
+        + 'og mål kontrollinjalen nederst på arket.');
+    }
+    $('#print-estimate').textContent = lines.join(' ');
   };
 
   ['change', 'input'].forEach((ev) => dialog.addEventListener(ev, refresh));
 
   $('#btn-print').addEventListener('click', () => {
     if (!pattern) return;
+    // Valgene avhenger av brikkemålet, så de bygges når dialogen åpnes.
+    const options = cellSizeOptions(state.pitch);
+    cellSel.innerHTML = options.map((o) => `<option value="${o.value}">${esc(o.name)}</option>`).join('');
+    cellSel.value = options.some((o) => o.value === state.print.cellSize)
+      ? state.print.cellSize
+      : options[0].value;
+
     $('#print-title').value = state.print.title || imageName;
-    cellSel.value = state.print.cellSize;
     $('#print-color').checked = state.print.color;
     $('#print-symbols').checked = state.print.symbols;
     $('#print-overlap').checked = state.print.overlap;
@@ -744,7 +812,7 @@ function wirePrintDialog() {
 }
 
 function doPrint() {
-  const mat = getMaterial(state.materialId);
+  const mat = currentMaterial();
   const root = $('#print-root');
   root.innerHTML = '';
   toast('Bygger utskriftsmal …');
@@ -759,7 +827,7 @@ function doPrint() {
     });
     root.appendChild(buildPrintSheets(pattern, {
       title: state.print.title || imageName || 'Byggemal',
-      materialName: mat.name,
+      materialName: mat.variantName ? `${mat.name} – ${mat.variantName}` : mat.name,
       unitPlural: mat.unitPlural,
       colorPrint: state.print.color,
       symbols: state.print.symbols,
@@ -790,6 +858,7 @@ function loadSettings() {
     const saved = JSON.parse(raw);
     Object.assign(state, saved, {
       offColors: new Set(saved.offColors || []),
+      variants: saved.variants || {},
       pitch: saved.pitch || state.pitch,
       print: { ...state.print, ...(saved.print || {}) },
     });
@@ -838,6 +907,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const num = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toString().replace('.', ',');
 const signed = (v) => (v > 0 ? '+' : '') + v;
+const round1 = (v) => Math.round(v * 10) / 10;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const posLabel = (v) => (v < 20 ? 'venstre/topp' : v > 80 ? 'høyre/bunn' : v === 50 ? 'midt' : String(v) + ' %');
 

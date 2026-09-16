@@ -15,13 +15,34 @@ const HEADER_H = 11;
 const FOOTER_H = 7;
 const LABEL = 6.5; // plass til rad-/kolonnenummer
 
-export const CELL_SIZE_OPTIONS = [
-  { id: 'auto', name: 'Automatisk', mm: null },
-  { id: 'liten', name: 'Liten – 5 mm (flest ruter per side)', mm: 5 },
-  { id: 'medium', name: 'Middels – 7 mm', mm: 7 },
-  { id: 'stor', name: 'Stor – 9 mm', mm: 9 },
-  { id: 'xl', name: 'Ekstra stor – 12 mm', mm: 12 },
-];
+/**
+ * Rutestørrelser å velge mellom på papir. Den første er naturlig størrelse:
+ * da er hver rute like stor som brikken, og man kan legge perlebrettet rett
+ * oppå utskriften og sette perlene i pinnene.
+ */
+export function cellSizeOptions(pitch) {
+  const opts = [
+    {
+      value: 'natural',
+      name: `Naturlig størrelse – ${fmt(pitch.w)} × ${fmt(pitch.h)} mm per brikke`,
+      trueScale: true,
+    },
+    { value: 'auto', name: 'Automatisk – færrest mulig sider' },
+  ];
+  for (const mm of [5, 7, 9, 12]) {
+    if (Math.abs(mm - pitch.w) < 0.05) continue; // allerede dekket av naturlig størrelse
+    opts.push({ value: String(mm), name: `${mm} mm per rute` });
+  }
+  return opts;
+}
+
+/** 'natural' = like stor som brikken, 'auto' = så stor som får plass. */
+function resolveCellMm(pattern, opts) {
+  if (opts.cellSize === 'natural') return opts.pitch ? opts.pitch.w : autoCellMm(pattern);
+  if (opts.cellSize === 'auto' || !opts.cellSize) return autoCellMm(pattern);
+  const v = Number(opts.cellSize);
+  return v > 0 ? v : autoCellMm(pattern);
+}
 
 function el(name, attrs = {}, text) {
   const node = document.createElementNS(SVG_NS, name);
@@ -65,8 +86,9 @@ function autoCellMm(pattern) {
  */
 export function buildPrintSheets(pattern, opts) {
   const frag = document.createDocumentFragment();
-  const cellMm = opts.cellSize === 'auto' || !opts.cellSize ? autoCellMm(pattern) : Number(opts.cellSize);
+  const cellMm = resolveCellMm(pattern, opts);
   const cellHMm = cellMm / (pattern.cellAspect || 1);
+  opts = { ...opts, trueScale: !!opts.pitch && Math.abs(cellMm - opts.pitch.w) < 0.05 };
 
   const availW = CONTENT_W - LABEL;
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
@@ -138,6 +160,10 @@ function buildOverviewPage(pattern, opts, info) {
     facts.push(`Antall farger: ${pattern.used.length}`);
     if (pattern.empty > 0) facts.push(`Tomme ruter: ${pattern.empty}`);
     facts.push(`Mønsteret er delt på ${info.tileCount} ${info.tileCount === 1 ? 'side' : 'sider'} (${info.tilesX} × ${info.tilesY}).`);
+    if (opts.trueScale) {
+      facts.push('Malen er i naturlig størrelse: legg brettet rett oppå arket.');
+      facts.push('Skriv ut uten skalering, og mål kontrollinjalen nederst.');
+    }
     if (pattern.grid === 'offset') facts.push('Annenhver rad er forskjøvet en halv brikke.');
 
     facts.forEach((t, i) => {
@@ -304,11 +330,30 @@ function buildGridPage(pattern, opts, t) {
     }, String(y + 1)));
   }
 
+  const scaleNote = opts.trueScale
+    ? `naturlig størrelse – ${fmt(cellMm)} × ${fmt(cellHMm)} mm per rute`
+    : `rutestørrelse ${fmt(cellMm)} × ${fmt(cellHMm)} mm`;
   svg.appendChild(el('text', { x: M, y: PAGE.h - M, class: 'p-foot' },
-    `Side ${t.index + 1} av ${t.total + 1} · rutestørrelse ${fmt(cellMm)} mm`));
+    `Side ${t.index + 1} av ${t.total + 1} · ${scaleNote}`));
+  svg.appendChild(rulerGroup(PAGE.w - M - 50, PAGE.h - M - 2.5));
 
   p.appendChild(svg);
   return p;
+}
+
+/**
+ * 50 mm kontrollinjal. Måler den ikke 5 cm på papiret, er utskriften skalert –
+ * da stemmer heller ikke naturlig størrelse, og brettet passer ikke oppå.
+ */
+function rulerGroup(x, y) {
+  const g = el('g', {});
+  g.appendChild(el('path', {
+    d: `M${x} ${y - 1.4}v2.8M${x} ${y}h50M${x + 50} ${y - 1.4}v2.8`
+      + `M${x + 10} ${y - 0.9}v1.8M${x + 20} ${y - 0.9}v1.8M${x + 30} ${y - 0.9}v1.8M${x + 40} ${y - 0.9}v1.8`,
+    stroke: '#111', 'stroke-width': 0.3, fill: 'none',
+  }));
+  g.appendChild(el('text', { x: x + 25, y: y - 2.4, class: 'p-axis' }, 'kontrollmål 50 mm'));
+  return g;
 }
 
 function trunc(s, n) {
@@ -321,7 +366,7 @@ function fmt(v) {
 
 /** Anslår hvor mange sider malen blir, uten å bygge dem. */
 export function estimateSheets(pattern, opts = {}) {
-  const cellMm = opts.cellSize === 'auto' || !opts.cellSize ? autoCellMm(pattern) : Number(opts.cellSize);
+  const cellMm = resolveCellMm(pattern, opts);
   const cellHMm = cellMm / (pattern.cellAspect || 1);
   const availW = CONTENT_W - LABEL;
   const availH = CONTENT_H - HEADER_H - FOOTER_H - LABEL;
